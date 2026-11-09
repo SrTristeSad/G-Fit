@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
 import PlansPanel from './PlansPanel.jsx';
+import AccessPanel from './AccessPanel.jsx';
 
 function Stat({ label, value, caption }) {
   return (
@@ -152,6 +153,12 @@ function AuditList({ events }) {
           parts.push('Limite: ' + event.changes.previousMaxStudents + ' → ' + event.changes.maxStudents);
         } else if (event.action === 'teacher.plan.removed') {
           parts.push('Plano desvinculado; limite preservado');
+        } else if (event.action === 'teacher.access.granted') {
+          parts.push('Prazo de acesso concedido ou redefinido manualmente');
+        } else if (event.action === 'teacher.access.renewed') {
+          parts.push('Renovação manual: ' + event.changes.months + ' mês(es)');
+        } else if (event.action === 'teacher.access.revoked') {
+          parts.push('Prazo de acesso revogado');
         }
         return (
           <li key={event.id}>
@@ -170,6 +177,7 @@ function AuditList({ events }) {
 export default function AdminPanel() {
   const [teachers, setTeachers] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [accessTerms, setAccessTerms] = useState([]);
   const [overview, setOverview] = useState(null);
   const [billing, setBilling] = useState(null);
   const [events, setEvents] = useState([]);
@@ -180,17 +188,19 @@ export default function AdminPanel() {
   const [error, setError] = useState('');
 
   const refresh = useCallback(async () => {
-    const [accounts, dashboard, audit, planList] = await Promise.all([
+    const [accounts, dashboard, audit, planList, accessList] = await Promise.all([
       api('/api/admin/teachers'),
       api('/api/admin/dashboard'),
       api('/api/admin/audit'),
       api('/api/admin/plans'),
+      api('/api/admin/access'),
     ]);
     setTeachers(accounts.teachers);
     setOverview(dashboard.overview);
     setBilling(dashboard.billing);
     setEvents(audit.events);
     setPlans(planList.plans);
+    setAccessTerms(accessList.accessTerms);
   }, []);
 
   useEffect(() => {
@@ -236,6 +246,9 @@ export default function AdminPanel() {
         </button>
         <button className={view === 'plans' ? 'active' : ''} onClick={() => setView('plans')}>
           Planos
+        </button>
+        <button className={view === 'access' ? 'active' : ''} onClick={() => setView('access')}>
+          Vigências
         </button>
         <button className={view === 'audit' ? 'active' : ''} onClick={() => setView('audit')}>
           Histórico
@@ -306,11 +319,12 @@ export default function AdminPanel() {
         </div>
       )}
       {view === 'plans' && <PlansPanel plans={plans} onChanged={reload} />}
+      {view === 'access' && <AccessPanel teachers={teachers} accessTerms={accessTerms} refresh={reload} />}
       {view === 'audit' && (
         <div className="card">
           <h2>Histórico de alterações</h2>
           <p className="muted">
-            Últimas 50 alterações de contas e planos, com autor e horário.
+            Últimas 50 alterações de contas, planos e vigências, com autor e horário.
             O histórico é somente leitura.
           </p>
           <AuditList events={events} />
