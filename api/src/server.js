@@ -13,6 +13,7 @@ import { registerWorkoutRoutes, maskToWeekdays } from './workouts.js';
 import { registerClassRoutes } from './classes.js';
 import { registerReportRoutes } from './reports.js';
 import { registerAssessmentRoutes } from './assessments.js';
+import { registerStudentPrivacyRoutes } from './student-privacy.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -242,6 +243,7 @@ registerWorkoutRoutes(app, requireTeacher, requireAccessForNewActivity);
 registerClassRoutes(app, requireTeacher, requireAccessForNewActivity);
 registerReportRoutes(app, requireTeacher);
 registerAssessmentRoutes(app, requireTeacher, requireAccessForNewActivity);
+registerStudentPrivacyRoutes(app, requireTeacher, rateLimit);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
