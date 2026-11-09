@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { db } from './db.js';
 import { registerBillingLifecycleRoutes, handleLifecycleEvent } from './billing-lifecycle.js';
+import { registerBillingMonitoringRoutes, recordWebhookAttempt, recordWebhookOutcome } from './billing-monitor.js';
 import {
   asaasConfigured, validCustomerId, validPaymentId, validBillDate,
   validWebhookToken, createAsaasCharge, getAsaasPayment, getAsaasPixQr,
@@ -161,6 +162,7 @@ export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLim
   // As rotas administrativas compartilham o limitador; o bloqueio de cobranças duplicadas continua no banco.
   const limited = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
   registerBillingLifecycleRoutes(app, requireTeacher, requireAdmin, limited);
+  registerBillingMonitoringRoutes(app, requireTeacher, requireAdmin);
 
   app.get('/api/admin/billing', requireTeacher, requireAdmin, async (_req, res) => {
     const [charges, customers, metrics] = await Promise.all([
@@ -354,41 +356,64 @@ export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLim
     const event = req.body;
     if (!event || typeof event.id !== 'string' || event.id.length < 4 || event.id.length > 180 ||
         /[\u0000-\u001f]/.test(event.id) ||
-        typeof event.event !== 'string' || event.event.length > 90) {
+        typeof event.event !== 'string' || !event.event.length || event.event.length > 90) {
       return res.status(400).json({ error: 'Evento inválido.' });
     }
     const providerId = event.payment?.id;
-    if ([
-      'PAYMENT_DELETED', 'PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED',
-      'PAYMENT_REFUND_IN_PROGRESS', 'PAYMENT_REFUND_DENIED',
-    ].includes(event.event)) {
-      if (!validPaymentId(providerId)) {
-        return res.status(400).json({ error: 'Pagamento inválido.' });
-      }
-      try {
-        const result = await handleLifecycleEvent(event.id, event.event, providerId);
-        return res.json({ received: true, ...result });
-      } catch (_error) {
-        return res.status(503).json({
-          error: 'Conciliação do ciclo da cobrança indisponível; evento pode ser reenviado.',
-        });
-      }
-    }
-    if (!['PAYMENT_RECEIVED','PAYMENT_CONFIRMED'].includes(event.event)) {
-      await db.query(
-        'INSERT INTO asaas_webhook_events (event_id,event_type,provider_payment_id,resolution) ' +
-        "VALUES ($1,$2,$3,'ignored') ON CONFLICT (event_id) DO NOTHING",
-        [event.id, event.event, validPaymentId(providerId) ? providerId : null],
-      );
-      return res.json({ received: true, ignored: true });
-    }
-    if (!validPaymentId(providerId)) return res.status(400).json({ error: 'Pagamento inválido.' });
     try {
-      const result = await processEvent(event.id, event.event, providerId);
-      res.json({ received: true, ...result });
+      await recordWebhookAttempt({
+        id: event.id,
+        event: event.event,
+        payment: { id: validPaymentId(providerId) ? providerId : null },
+      });
     } catch (_error) {
-      res.status(503).json({ error: 'Falha de conciliação; o provedor poderá reenviar o evento.' });
+      // Falha no diagnóstico nunca permite confirmar eventos sem persistência.
+      return res.status(503).json({ error: 'Não foi possível registrar a tentativa de webhook.' });
     }
+
+    let httpStatus = 200;
+    let response = null;
+    let errorCode = null;
+    try {
+      if ([
+        'PAYMENT_DELETED', 'PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED',
+        'PAYMENT_REFUND_IN_PROGRESS', 'PAYMENT_REFUND_DENIED',
+      ].includes(event.event)) {
+        if (!validPaymentId(providerId)) {
+          httpStatus = 400;
+          response = { error: 'Pagamento inválido.' };
+        } else {
+          const result = await handleLifecycleEvent(event.id, event.event, providerId);
+          response = { received: true, ...result };
+        }
+      } else if (['PAYMENT_RECEIVED','PAYMENT_CONFIRMED'].includes(event.event)) {
+        if (!validPaymentId(providerId)) {
+          httpStatus = 400;
+          response = { error: 'Pagamento inválido.' };
+        } else {
+          const result = await processEvent(event.id, event.event, providerId);
+          response = { received: true, ...result };
+        }
+      } else {
+        await db.query(
+          'INSERT INTO asaas_webhook_events (event_id,event_type,provider_payment_id,resolution) ' +
+          "VALUES ($1,$2,$3,'ignored') ON CONFLICT (event_id) DO NOTHING",
+          [event.id, event.event, validPaymentId(providerId) ? providerId : null],
+        );
+        response = { received: true, ignored: true };
+      }
+    } catch (_error) {
+      // Asaas considera somente HTTP 200 como entregue; falhas podem ser reenviadas.
+      httpStatus = 503;
+      errorCode = 'DB_PROCESSING_FAILED';
+      response = { error: 'Conciliação indisponível; evento pode ser reenviado.' };
+    }
+    try {
+      await recordWebhookOutcome(event.id, httpStatus, errorCode);
+    } catch (_error) {
+      return res.status(503).json({ error: 'Falha no registro do resultado; tente entregar novamente.' });
+    }
+    return res.status(httpStatus).json(response);
   });
 
   // Recupera uma criacao inconclusiva sem jamais criar outra cobranca.
