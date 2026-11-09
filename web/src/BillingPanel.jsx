@@ -47,6 +47,30 @@ function Charge({ charge, admin, onRefresh }) {
     finally { setLoading(false); }
   }
 
+  async function cancelPending() {
+    if (!window.confirm(
+      'Cancelar esta cobrança Pix de TESTE no Asaas? Não é um estorno e a cobrança deixará de aceitar pagamentos.',
+    )) return;
+    setError('');
+    setLoading(true);
+    try {
+      await api('/api/admin/billing/charges/' + charge.id + '/cancel', { method: 'POST' });
+      setQr(null);
+      await onRefresh();
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+
+  async function checkRefunds() {
+    setError('');
+    setLoading(true);
+    try {
+      await api('/api/admin/billing/charges/' + charge.id + '/refunds/check', { method: 'POST' });
+      await onRefresh();
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+
   async function copyPix() {
     try { await navigator.clipboard.writeText(qr.payload); }
     catch { setError('Não foi possível copiar automaticamente. Selecione o código abaixo.'); }
@@ -56,13 +80,27 @@ function Charge({ charge, admin, onRefresh }) {
     <div className="billing-charge">
       <div className="section-heading">
         <strong>{charge.planName} — {brl(charge.amountCents)}</strong>
-        <span className="tag">{status[charge.status] || charge.status}</span>
+        <span className="tag">{charge.overdue ? 'Vencida — aguardando conciliação' :
+          (status[charge.status] || charge.status)}</span>
       </div>
       {admin && <small className="muted">Professor: {charge.teacherName}</small>}
       <small className="muted">Vencimento: {charge.dueDate} · Cobrança G-Fit: {charge.id}</small>
       {charge.paidAt && <small className="saved-message">
         Recebimento validado: {new Date(charge.paidAt).toLocaleString('pt-BR')}
       </small>}
+      {charge.cancelledAt && <small className="muted">
+        Cancelamento confirmado: {new Date(charge.cancelledAt).toLocaleString('pt-BR')}
+      </small>}
+      {charge.refundState && charge.refundState !== 'none' && (
+        <p className="notice" role="status">
+          Estorno: {charge.refundState === 'pending' ? 'em processamento' :
+            charge.refundState === 'partial' ? 'parcialmente concluído' :
+            charge.refundState === 'full' ? 'concluído integralmente' :
+            'necessita conferência manual'}.
+          {' '}Valor devolvido confirmado: {brl(charge.refundedCents || 0)}.
+          A vigência do professor não foi alterada automaticamente.
+        </p>
+      )}
       <div className="actions">
         {(charge.status === 'pending' || charge.status === 'paid') && (
           <button type="button" className="secondary-light" disabled={loading} onClick={getQr}>
@@ -77,6 +115,16 @@ function Charge({ charge, admin, onRefresh }) {
         {admin && charge.status === 'creating' && !charge.providerPaymentId && (
           <button type="button" className="secondary-light" disabled={loading} onClick={recover}>
             Recuperar no Asaas
+          </button>
+        )}
+        {admin && charge.status === 'pending' && (
+          <button type="button" className="danger-light" disabled={loading} onClick={cancelPending}>
+            Cancelar cobrança de teste
+          </button>
+        )}
+        {admin && charge.status === 'paid' && (
+          <button type="button" className="secondary-light" disabled={loading} onClick={checkRefunds}>
+            Consultar estornos
           </button>
         )}
       </div>
@@ -212,6 +260,21 @@ export default function BillingPanel({ admin = false, teachers = [] }) {
         {error && <p role="alert" className="error">{error}</p>}
         {feedback && <p role="status" className="saved-message">{feedback}</p>}
       </div>
+      {admin && data?.summary && (
+        <div className="admin-stats" aria-label="Resumo financeiro do sandbox">
+          <div className="admin-stat"><span>Aguardando pagamento</span><strong>{data.summary.pendingCount}</strong></div>
+          <div className="admin-stat"><span>Vencidas e pendentes</span><strong>{data.summary.overdueCount}</strong></div>
+          <div className="admin-stat"><span>Canceladas</span><strong>{data.summary.cancelledCount}</strong></div>
+          <div className="admin-stat"><span>Recebidas (teste)</span><strong>{data.summary.paidCount}</strong></div>
+          <div className="admin-stat"><span>Casos de estorno</span><strong>{data.summary.refundReviewCount}</strong></div>
+          <div className="admin-stat"><span>Em conciliação</span><strong>{data.summary.reconciliationCount}</strong></div>
+        </div>
+      )}
+      {admin && data?.summary && (
+        <p className="notice">Somente sandbox. Recebimentos brutos registrados: {brl(Number(data.summary.grossPaidCents))}.
+          {' '}Estornos concluídos: {brl(Number(data.summary.confirmedRefundedCents))}.
+          Não são valores financeiros reais nem demonstrativo contábil.</p>
+      )}
       <div className="card">
         <div className="section-heading">
           <h2>Histórico de cobranças</h2>
