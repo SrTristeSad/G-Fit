@@ -325,3 +325,28 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
   .card,.report-trend { box-shadow:none; break-inside:avoid; }
   .report-page { font-size:11px; }
 }
+
+
+/* Histórico de avaliações funcionais sem classificação automática de saúde */
+.assessment-list,.assessment-comparisons { display:grid; gap:13px; }
+.assessment-entry,.assessment-comparison { display:grid; gap:10px; border:1px solid #dce6df;
+  border-radius:12px; background:#fbfdfb; padding:16px; min-width:0; }
+.assessment-entry .section-heading { align-items:start; }
+.assessment-entry .section-heading>div { display:grid; gap:4px; }
+.assessment-entry .tag { white-space:normal; max-width:100%; overflow-wrap:anywhere; }
+.assessment-entry p { margin:0; overflow-wrap:anywhere; }
+.assessment-entry strong,.assessment-comparison strong { color:#17593b; }
+.assessment-entry small,.assessment-comparison small { overflow-wrap:anywhere; }
+.assessment-comparisons { grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
+.assessment-values { display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px; font-variant-numeric:tabular-nums; }
+.assessment-values span { background:#eaf4ec; border-radius:9px; padding:9px; overflow-wrap:anywhere; }
+.assessment-revisions { background:#f2f7f3; border:1px solid #d7e4d9;
+  border-radius:10px; padding:13px; }
+.assessment-revisions h4 { margin:0 0 8px; }
+.assessment-revisions ul { margin:0; padding-left:20px; display:grid; gap:8px; }
+.assessment-revisions li small { display:block; margin-top:3px; }
+@media(max-width:560px) {
+  .assessment-values { grid-template-columns:1fr; }
+  .assessment-entry .actions button { flex:1 1 180px; }
+}
