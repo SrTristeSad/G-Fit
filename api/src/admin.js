@@ -18,6 +18,8 @@ export function registerAdminReadRoutes(app, requireTeacher, requireAdmin) {
       ' (SELECT COUNT(*)::INTEGER FROM class_sessions) AS "classSessions",',
       ' (SELECT COUNT(*)::INTEGER FROM class_attendance WHERE status=\'present\') AS "attendancePresent",',
       ' (SELECT COUNT(*)::INTEGER FROM class_attendance WHERE status=\'absent\') AS "attendanceAbsent",',
+      ' (SELECT COUNT(*)::INTEGER FROM student_data_exports) AS "studentExportsTotal",',
+      ' (SELECT COUNT(*)::INTEGER FROM student_data_exports WHERE exported_at >= NOW() - INTERVAL \'30 days\') AS "studentExportsLast30d",',
       ' (SELECT COUNT(*)::INTEGER FROM teachers WHERE NOT is_admin AND created_at >= NOW() - INTERVAL \'30 days\') AS "teachersNew30d",',
       ' (SELECT COUNT(*)::INTEGER FROM students WHERE created_at >= NOW() - INTERVAL \'30 days\') AS "studentsNew30d",',
       ' (SELECT COUNT(*)::INTEGER FROM teacher_access_terms WHERE revoked_at IS NULL AND starts_on <= CURRENT_DATE AND ends_on >= CURRENT_DATE) AS "manualAccessActive",',
