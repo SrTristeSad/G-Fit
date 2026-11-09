@@ -10,6 +10,7 @@ import { registerAccessRoutes, requireAccessForNewActivity } from './access.js';
 import { registerBillingRoutes } from './billing.js';
 import { registerAdminAlertRoutes, startAdminAlertScanner } from './admin-alerts.js';
 import { registerWorkoutRoutes, maskToWeekdays } from './workouts.js';
+import { registerClassRoutes } from './classes.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -236,6 +237,7 @@ registerAccessRoutes(app, requireTeacher, requireAdmin);
 registerBillingRoutes(app, requireTeacher, requireAdmin, rateLimit);
 registerAdminAlertRoutes(app, requireTeacher, requireAdmin, rateLimit);
 registerWorkoutRoutes(app, requireTeacher, requireAccessForNewActivity);
+registerClassRoutes(app, requireTeacher, requireAccessForNewActivity);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
@@ -348,6 +350,14 @@ app.patch('/api/students/:id/status', requireTeacher, (req, res, next) => {
       'UPDATE students SET is_active=$3, updated_at=NOW() WHERE id=$1 AND teacher_id=$2 RETURNING ' + studentSelect,
       [req.params.id, req.teacher.id, active],
     );
+    if (!active && student.rows[0].is_active) {
+      // Ao arquivar, libera vagas em turmas sem apagar a presença histórica.
+      await client.query(
+        'UPDATE class_enrollments SET is_active=FALSE,updated_at=NOW() ' +
+        'WHERE student_id=$1 AND teacher_id=$2 AND is_active',
+        [req.params.id,req.teacher.id],
+      );
+    }
     await client.query('COMMIT');
     res.json({ student: result.rows[0] });
   } catch (error) { await client.query('ROLLBACK'); throw error; }
