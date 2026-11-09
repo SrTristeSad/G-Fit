@@ -21,8 +21,8 @@ export async function recordWebhookAttempt(event) {
 export async function recordWebhookOutcome(eventId, httpStatus, errorCode = null) {
   const safeCode = SAFE_ERROR_CODES.has(errorCode) ? errorCode : null;
   await db.query(
-    'UPDATE asaas_webhook_attempts SET last_http_status=$2,last_error_code=$3, ' +
-    'failure_count=failure_count + CASE WHEN $2 >= 400 THEN 1 ELSE 0 END ' +
+    'UPDATE asaas_webhook_attempts SET last_http_status=$2::smallint,last_error_code=$3::varchar, ' +
+    'failure_count=failure_count + CASE WHEN $2::smallint >= 400 THEN 1 ELSE 0 END ' +
     'WHERE event_id=$1',
     [eventId, httpStatus, safeCode],
   );
