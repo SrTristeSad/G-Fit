@@ -9,6 +9,7 @@ import { registerPlanRoutes } from './plans.js';
 import { registerAccessRoutes, requireAccessForNewActivity } from './access.js';
 import { registerBillingRoutes } from './billing.js';
 import { registerAdminAlertRoutes, startAdminAlertScanner } from './admin-alerts.js';
+import { registerWorkoutRoutes, maskToWeekdays } from './workouts.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -234,6 +235,7 @@ registerPlanRoutes(app, requireTeacher, requireAdmin);
 registerAccessRoutes(app, requireTeacher, requireAdmin);
 registerBillingRoutes(app, requireTeacher, requireAdmin, rateLimit);
 registerAdminAlertRoutes(app, requireTeacher, requireAdmin, rateLimit);
+registerWorkoutRoutes(app, requireTeacher, requireAccessForNewActivity);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
@@ -276,6 +278,8 @@ app.get('/api/students/:id', requireTeacher, async (req, res) => {
   if (!student.rows.length) return res.status(404).json({ error: 'Aluno não encontrado.' });
   const exercises = await db.query(
     'SELECT e.id, e.title, e.sets, e.repetitions, e.schedule, e.instructions, ' +
+    'e.weekdays_mask AS "weekdaysMask", e.duration_minutes AS "durationMinutes", ' +
+    'e.library_exercise_id AS "libraryExerciseId", ' +
     'COUNT(c.id)::INTEGER AS "completedCount", MAX(c.completed_at) AS "lastCompletedAt" ' +
     'FROM student_exercises e LEFT JOIN exercise_completions c ON c.exercise_id = e.id ' +
     'WHERE e.student_id = $1 AND e.teacher_id = $2 GROUP BY e.id ORDER BY e.created_at DESC',
@@ -283,7 +287,7 @@ app.get('/api/students/:id', requireTeacher, async (req, res) => {
   );
   res.json({
     student: student.rows[0],
-    exercises: exercises.rows,
+    exercises: exercises.rows.map(e => ({ ...e, weekdays: maskToWeekdays(e.weekdaysMask) })),
     summary: {
       assignedExercises: exercises.rows.length,
       loggedCompletions: exercises.rows.reduce((n, e) => n + e.completedCount, 0),
@@ -348,30 +352,6 @@ app.patch('/api/students/:id/status', requireTeacher, (req, res, next) => {
     res.json({ student: result.rows[0] });
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
-});
-app.post('/api/students/:id/exercises', requireTeacher, requireAccessForNewActivity, async (req, res) => {
-  if (!validId(req.params.id)) return res.status(400).json({ error: 'Identificador inválido.' });
-  const { title, sets, repetitions, schedule, instructions } = req.body ?? {};
-  if (!validStudentName(title) || !Number.isInteger(sets) || sets < 1 || sets > 30 ||
-      !Number.isInteger(repetitions) || repetitions < 1 || repetitions > 500) {
-    return res.status(400).json({ error: 'Informe exercício, séries (1–30) e repetições (1–500).' });
-  }
-  let scheduleValue, instructionsValue;
-  try {
-    scheduleValue = optionalText(schedule, 120);
-    instructionsValue = optionalText(instructions, 1000);
-  } catch (_error) { return res.status(400).json({ error: 'Texto do exercício é muito longo.' }); }
-  const student = await db.query(
-    'SELECT id FROM students WHERE id=$1 AND teacher_id=$2 AND is_active',
-    [req.params.id, req.teacher.id],
-  );
-  if (!student.rows.length) return res.status(404).json({ error: 'Aluno ativo não encontrado.' });
-  const result = await db.query(
-    'INSERT INTO student_exercises (id, teacher_id, student_id, title, sets, repetitions, schedule, instructions) ' +
-    'VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, title, sets, repetitions, schedule, instructions',
-    [randomUUID(), req.teacher.id, req.params.id, title.trim(), sets, repetitions, scheduleValue, instructionsValue],
-  );
-  res.status(201).json({ exercise: result.rows[0] });
 });
 app.delete('/api/students/:id/exercises/:exerciseId', requireTeacher, async (req, res) => {
   if (!validId(req.params.id) || !validId(req.params.exerciseId)) return res.status(400).json({ error: 'Identificador inválido.' });
