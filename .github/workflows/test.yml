@@ -78,6 +78,15 @@ jobs:
           node api/test/classes-e2e.mjs
           node api/test/reports-e2e.mjs
           node api/test/assessments-e2e.mjs
+          # Exportações usam autenticação própria; mantenha o limite real de login ativo.
+          docker compose restart api
+          ready=0
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:8080/api/health > /dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          test "$ready" = "1"
+          node api/test/student-privacy-e2e.mjs
           # Segunda janela isolada de autenticação para os testes extensos do Pix.
           docker compose restart api
           ready=0
