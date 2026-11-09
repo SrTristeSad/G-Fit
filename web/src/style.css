@@ -235,3 +235,33 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
 @media(max-width:1100px) { .weekly-board { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 @media(max-width:700px) { .weekly-board { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:380px) { .weekly-board { grid-template-columns:1fr; } }
+
+
+/* Turmas, horários e presenças manuais */
+.class-list { display:grid; gap:10px; margin:18px 0 32px; }
+.class-choice,.session-choice { display:grid; gap:4px; width:100%; text-align:left;
+  border:1px solid #d6e2d8; border-radius:12px; background:#f9fcfa; padding:14px;
+  font:inherit; color:#183329; }
+.class-choice.selected,.session-choice.selected { border-color:#247c4f;
+  background:#e6f5e8; box-shadow:inset 0 0 0 1px #247c4f; }
+.class-choice strong,.session-choice strong { color:#165b3c; }
+.class-choice span,.session-choice span,.session-choice small { font-size:13px; color:#5a7162; }
+.divider-line { border-top:1px solid #e1eae2; margin:8px 0; }
+.simple-roster { list-style:none; padding:0; margin:12px 0 18px; display:grid; gap:10px; }
+.simple-roster li { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+  gap:10px; padding:10px 0; border-bottom:1px solid #e5ede6; }
+.simple-roster button { min-height:40px; }
+.inline-class-form { display:flex; flex-wrap:wrap; gap:12px; align-items:end; }
+.inline-class-form label { flex:1; min-width:190px; }
+.inline-class-form button { min-height:45px; }
+.session-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px; margin:20px 0; }
+.attendance-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px; margin:14px 0; }
+.attendance-grid label { padding:12px; border:1px solid #dae5db;
+  background:#fbfefb; border-radius:10px; min-width:0; }
+.attendance-grid select { width:100%; }
+@media(max-width:700px) {
+  .session-list,.attendance-grid { grid-template-columns:1fr; }
+  .inline-class-form label,.inline-class-form button { width:100%; }
+}
