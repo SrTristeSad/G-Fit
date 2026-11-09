@@ -14,7 +14,10 @@ export function registerAdminReadRoutes(app, requireTeacher, requireAdmin) {
       ' (SELECT COUNT(*)::INTEGER FROM student_exercises) AS "exercisesAssigned",',
       ' (SELECT COUNT(*)::INTEGER FROM exercise_completions) AS "completionsLogged",',
       ' (SELECT COUNT(*)::INTEGER FROM teachers WHERE NOT is_admin AND created_at >= NOW() - INTERVAL \'30 days\') AS "teachersNew30d",',
-      ' (SELECT COUNT(*)::INTEGER FROM students WHERE created_at >= NOW() - INTERVAL \'30 days\') AS "studentsNew30d"',
+      ' (SELECT COUNT(*)::INTEGER FROM students WHERE created_at >= NOW() - INTERVAL \'30 days\') AS "studentsNew30d",',
+      ' (SELECT COUNT(*)::INTEGER FROM teacher_access_terms WHERE revoked_at IS NULL AND starts_on <= CURRENT_DATE AND ends_on >= CURRENT_DATE) AS "manualAccessActive",',
+      ' (SELECT COUNT(*)::INTEGER FROM teacher_access_terms WHERE revoked_at IS NULL AND ends_on < CURRENT_DATE) AS "manualAccessExpired",',
+      ' (SELECT COUNT(*)::INTEGER FROM teacher_access_terms WHERE revoked_at IS NULL AND starts_on > CURRENT_DATE) AS "manualAccessScheduled"',
     ].join('\n'));
     res.json({
       overview: result.rows[0],
