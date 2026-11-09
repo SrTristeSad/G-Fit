@@ -127,3 +127,5 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
   .header-name { display: none; }
   .teacher-controls { align-items: center; }
 }
+
+.auth-card-wide { max-width: 630px; }
