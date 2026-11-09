@@ -297,6 +297,8 @@ export default function AdminPanel() {
             <Stat label="Aulas cadastradas" value={overview?.classSessions ?? '—'} />
             <Stat label="Presenças manuais" value={overview?.attendancePresent ?? '—'}
               caption={overview ? overview.attendanceAbsent + ' faltas registradas' : ''} />
+            <Stat label="Exportações de alunos" value={overview?.studentExportsTotal ?? '—'}
+              caption={overview ? overview.studentExportsLast30d + ' nos últimos 30 dias' : ''} />
             <Stat label="Novos professores (30 dias)" value={overview?.teachersNew30d ?? '—'} />
             <Stat label="Prazos ativos (manual)" value={overview?.manualAccessActive ?? '—'} />
             <Stat label="Prazos vencidos (manual)" value={overview?.manualAccessExpired ?? '—'} />
