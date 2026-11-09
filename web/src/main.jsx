@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { api } from './api.js';
 import StudentProfile from './StudentProfile.jsx';
 import AdminPanel from './AdminPanel.jsx';
+import AccountPanel from './AccountPanel.jsx';
 import './style.css';
 
 function App() {
@@ -134,8 +135,15 @@ function App() {
                   setTab('admin'); setSelectedId(null);
                 }}>Administração</button>
               )}
+              <button className={tab === 'account' ? 'active' : ''} onClick={() => {
+                setTab('account'); setSelectedId(null);
+              }}>Minha conta</button>
             </nav>
-            {tab === 'admin' && teacher.isAdmin ? <AdminPanel /> :
+            {tab === 'account' ? <AccountPanel onPasswordChanged={() => {
+                setTeacher(null); setStudents([]); setTab('students'); setSelectedId(null);
+                setError('Senha alterada. Entre novamente com a nova senha.');
+              }} /> :
+              tab === 'admin' && teacher.isAdmin ? <AdminPanel /> :
               selectedId ? (
                 <StudentProfile id={selectedId} onBack={() => setSelectedId(null)} onChanged={refreshStudents} />
               ) : (
