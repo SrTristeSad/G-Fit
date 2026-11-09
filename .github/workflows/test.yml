@@ -48,6 +48,20 @@ jobs:
           curl -fsS -b /tmp/gfit-cookie-1 -X POST http://localhost:8080/api/auth/logout | grep -q '"ok":true'
           code=$(curl -sS -o /dev/null -w '%{http_code}' -b /tmp/gfit-cookie-1 http://localhost:8080/api/students)
           test "$code" = "401"
+      - name: Administrator provisioning and role/limit integration tests
+        env:
+          POSTGRES_PASSWORD: test_only_not_for_production
+        run: |
+          set -euo pipefail
+          docker compose exec -T api node src/bootstrap-admin.js admin@example.com > /tmp/gfit-admin.txt
+          export ADMIN_PASSWORD
+          ADMIN_PASSWORD="$(sed -n 's/^Password: //p' /tmp/gfit-admin.txt)"
+          test -n "$ADMIN_PASSWORD"
+          node api/test/e2e.mjs
+          if docker compose exec -T api node src/bootstrap-admin.js outro@example.com > /dev/null 2>&1; then
+            echo "ERROR: second admin bootstrap should be blocked"
+            exit 1
+          fi
       - name: Stop test services
         if: always()
         env:
