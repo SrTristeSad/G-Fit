@@ -48,6 +48,10 @@ npm test
 - [x] Dashboard administrativo com totais de professores, alunos e atividades
 - [x] Histórico auditável das alterações de limites e situação das contas
 - [x] Busca e filtros de professores na administração
+- [x] Catálogo de planos comerciais: valores em centavos, frequência mensal/anual e cotas
+- [x] Atribuição e remoção manual de planos por professor, com atualização atômica da cota
+- [x] Ativação e desativação de planos; bloqueio de novos vínculos com plano desativado
+- [x] Histórico auditável de criação, ativação e atribuição de planos
 - [x] Limite inicial de **20 alunos ativos** por professor, editável pelo administrador (0 a 10.000)
 - [ ] Turmas, avaliações funcionais, prescrição por tempo e relatórios mais completos
 - [ ] Integração com o catálogo do [openGym](https://github.com/DuarteSantos8/openGym)
@@ -72,4 +76,21 @@ A informação de realização de atividade é **declarada manualmente pelo prof
 
 A área **Administração → Visão geral** apresenta estatísticas agregadas de professores, alunos e atividades. **Administração → Professores** permite busca, filtragem, ajustes de limites e ativação/desativação de contas. **Administração → Histórico** mostra as 50 alterações mais recentes feitas em limites e situação de contas, identificando quem realizou a operação. As alterações são registradas na mesma transação no banco de dados.
 
-**Ainda não implementado:** cobrança Pix, receita e assinaturas; criação de professores por convite; planos e permissões comerciais; exportação e retenção do histórico de auditoria; monitoramento do servidor. Os números do painel refletem somente os registros da base de dados, não dados financeiros inventados.
+**Ainda não implementado:** cobrança Pix, receita, confirmação de pagamento, renovação e vencimento de assinaturas; criação de professores por convite; regras de planos baseadas em pagamento; exportação e retenção do histórico de auditoria; monitoramento do servidor. Os números do painel refletem somente os registros da base de dados, não dados financeiros inventados.
+
+## Planos comerciais — protótipo sem pagamentos
+
+Em **Administração → Planos**, o administrador pode criar planos com nome, descrição, preço em centavos de real (interface em R$), periodicidade mensal ou anual e limite padrão de alunos ativos. O preço é **configurável, mas não é cobrado**: não há checkout, faturas, recibos, Pix ou assinatura paga nesta versão.
+
+Em **Administração → Professores**, selecione um plano disponível para um professor. Essa ação é uma **atribuição manual**, não comprovação de pagamento. A cota `teachers.max_students` passa a ser o limite do plano, preservando a regra existente de controle de vagas inclusive contra cadastros simultâneos. Ajustes individuais posteriores ainda são possíveis; atribuir outro plano redefine a cota conforme o novo plano. Desvincular um plano **não altera a cota atual** e não apaga alunos. Desativar um plano bloqueia novas atribuições, mas não suspende contas nem modifica professores já vinculados.
+
+Planos publicados não podem ter preço, periodicidade ou cotas editados nesta etapa. Para mudanças comerciais, crie outra versão do plano e atribua-a aos professores desejados. Isso evita atualizar silenciosamente valores exibidos nas contas existentes.
+
+**Rotas de planos (API Node.js):**
+
+- `GET/POST /api/admin/plans` — catálogo e criação; apenas administrador.
+- `PATCH /api/admin/plans/:id` — disponibilidade do plano; apenas administrador.
+- `PUT/DELETE /api/admin/teachers/:id/plan` — vínculo manual; apenas administrador.
+- `GET /api/account/plan` — consulta do próprio professor, sem dados de outros usuários.
+
+Criações e alterações ficam registradas em `admin_audit_logs`. É necessário implementar o modelo de cobrança e a verificação de eventos Pix antes de vincular acesso a pagamentos.
