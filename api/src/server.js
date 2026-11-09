@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { db, initDatabase } from './db.js';
 import { registerAdminReadRoutes } from './admin.js';
 import { registerPlanRoutes } from './plans.js';
+import { registerAccessRoutes, requireAccessForNewActivity } from './access.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -228,6 +229,7 @@ app.patch('/api/admin/teachers/:id', requireTeacher, requireAdmin, async (req, r
 
 registerAdminReadRoutes(app, requireTeacher, requireAdmin);
 registerPlanRoutes(app, requireTeacher, requireAdmin);
+registerAccessRoutes(app, requireTeacher, requireAdmin);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
@@ -238,7 +240,7 @@ app.get('/api/students', requireTeacher, async (req, res) => {
   const activeStudents = result.rows.filter(row => row.active).length;
   res.json({ students: result.rows, quota: { activeStudents, maxStudents: req.teacher.max_students } });
 });
-app.post('/api/students', requireTeacher, async (req, res) => {
+app.post('/api/students', requireTeacher, requireAccessForNewActivity, async (req, res) => {
   if (!validStudentName(req.body?.name)) {
     return res.status(400).json({ error: 'Informe nome do aluno (2 a 120 caracteres).' });
   }
@@ -310,7 +312,10 @@ app.put('/api/students/:id', requireTeacher, async (req, res) => {
     throw error;
   }
 });
-app.patch('/api/students/:id/status', requireTeacher, async (req, res) => {
+app.patch('/api/students/:id/status', requireTeacher, (req, res, next) => {
+  if (req.body?.active === true) return requireAccessForNewActivity(req, res, next);
+  next();
+}, async (req, res) => {
   const { active } = req.body ?? {};
   if (!validId(req.params.id) || typeof active !== 'boolean') {
     return res.status(400).json({ error: 'Informe uma situação válida.' });
@@ -340,7 +345,7 @@ app.patch('/api/students/:id/status', requireTeacher, async (req, res) => {
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
 });
-app.post('/api/students/:id/exercises', requireTeacher, async (req, res) => {
+app.post('/api/students/:id/exercises', requireTeacher, requireAccessForNewActivity, async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ error: 'Identificador inválido.' });
   const { title, sets, repetitions, schedule, instructions } = req.body ?? {};
   if (!validStudentName(title) || !Number.isInteger(sets) || sets < 1 || sets > 30 ||
