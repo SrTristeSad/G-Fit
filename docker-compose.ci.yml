@@ -1,0 +1,18 @@
+# Somente CI. Nunca use esta sobreposicao com chaves reais.
+services:
+  api:
+    environment:
+      NODE_ENV: test
+      ASAAS_API_KEY: test_asaas_api_key_for_mock_only_00001
+      ASAAS_WEBHOOK_TOKEN: test_webhook_token_supersecret_12345678
+      ASAAS_TEST_BASE_URL: http://mock-asaas:3333/v3
+    depends_on:
+      mock-asaas:
+        condition: service_started
+  mock-asaas:
+    image: node:22-alpine
+    command: ["node", "/app/mock-asaas.mjs"]
+    volumes:
+      - ./api/test/mock-asaas.mjs:/app/mock-asaas.mjs:ro
+    ports:
+      - "127.0.0.1:3333:3333"
