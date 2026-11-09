@@ -21,7 +21,7 @@ export function registerAdminReadRoutes(app, requireTeacher, requireAdmin) {
     ].join('\n'));
     res.json({
       overview: result.rows[0],
-      billing: { connected: false, message: 'Cobranças Pix ainda não estão integradas.' },
+      billing: { connected: false, sandbox: true, message: 'Pix disponível apenas no Asaas Sandbox; ainda não há faturamento real.' },
     });
   });
 
