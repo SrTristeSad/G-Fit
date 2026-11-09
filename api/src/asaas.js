@@ -81,6 +81,14 @@ export function getAsaasPayment(id) {
   if (!validPaymentId(id)) throw new Error('INVALID_PAYMENT_ID');
   return asaasRequest('/payments/' + encodeURIComponent(id));
 }
+export function findAsaasPaymentsByReference(referenceId) {
+  if (typeof referenceId !== 'string' ||
+      !/^[a-f0-9]{8}-[a-f0-9-]{27,36}$/i.test(referenceId)) {
+    throw new Error('INVALID_REFERENCE');
+  }
+  return asaasRequest('/payments?externalReference=' + encodeURIComponent(referenceId) + '&limit=100');
+}
+
 export function getAsaasPixQr(id) {
   if (!validPaymentId(id)) throw new Error('INVALID_PAYMENT_ID');
   return asaasRequest('/payments/' + encodeURIComponent(id) + '/pixQrCode');
