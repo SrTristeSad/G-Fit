@@ -51,6 +51,8 @@ npm test
 - [x] Indicadores administrativos agregados de turmas, aulas e presenças, sem exposição de alunos individuais
 - [x] Aulas cadastradas por data e presença manual (presente, ausente, justificado), com correção de registros
 - [x] Relatórios por período, turma e aluno: presenças/ausências, justificativas e realizações manuais de exercícios
+- [x] Avaliações funcionais descritivas na ficha do aluno, com registros datados e medições opcionais
+- [x] Correções auditáveis, retirada lógica de registros incorretos e comparação numérica de testes equivalentes
 - [x] Gráficos de evolução dos registros por mês e versão para impressão, sem interpretação clínica
 - [x] Compatibilidade com exercícios antigos em texto livre, sem apagar os registros de realização
 - [x] Administração: ver professores, ativar/desativar contas e definir máximo de alunos ativos
@@ -65,7 +67,7 @@ npm test
 - [x] Bloqueio de novos alunos, reativações e novas prescrições quando o prazo não está ativo (sem apagar fichas)
 - [x] Painel de Vigências com status ativo, agendado, vencido ou revogado e métricas agregadas
 - [x] Limite inicial de **20 alunos ativos** por professor, editável pelo administrador (0 a 10.000)
-- [ ] Avaliações funcionais, relatórios clínicos de evolução validados por profissional, recorrência automática de sessões e integração com calendários
+- [ ] Protocolos de avaliação validados, referências clínicas aprovadas por profissional, recorrência automática de sessões e integração com calendários
 - [ ] Integração com o catálogo do [openGym](https://github.com/DuarteSantos8/openGym)
 - [x] Pix Asaas Sandbox: cobrança, QR dinâmico, Pix Copia e Cola, webhook autenticado e conciliação idempotente
 - [x] Renovação de vigência após pagamento verificado em sandbox, sem sobrescrever revogação administrativa
@@ -86,6 +88,18 @@ npm test
 ## Licença
 
 AGPL-3.0-or-later, conforme o arquivo `LICENSE`. Ao disponibilizar uma versão modificada pela rede, observe as obrigações de disponibilização de código-fonte da AGPL.
+
+## Avaliações funcionais descritivas
+
+Na ficha individual do aluno, em **Avaliações funcionais**, o professor pode registrar observações nas categorias **mobilidade, equilíbrio, força, resistência** ou **outro**, com data, nome escolhido para o teste, procedimento ou protocolo utilizado, anotações e resultado numérico opcional. Os resultados podem usar segundos, repetições, metros, centímetros, quilogramas ou pontos. Quando não há medição numérica, a observação em texto é obrigatória.
+
+O sistema **não escolhe testes**, **não aplica valores de referência**, **não define risco de queda** e **não declara melhora ou piora**. As comparações mostram somente a diferença matemática entre resultados do mesmo nome de teste, categoria, protocolo e unidade, feitos em **datas diferentes**. Um valor maior ou menor não necessariamente representa melhor desempenho: a interpretação e a adequação dos testes são responsabilidade do profissional habilitado.
+
+O histórico visível mostra até os **200 registros mais recentes** e informa quando há mais entradas no banco. As avaliações de alunos arquivados continuam disponíveis para consulta; novas avaliações e correções exigem aluno e vigência ativos. Registros incorretos podem ser **corrigidos** (com preservação dos valores anteriores em auditoria) ou **retirados do histórico visível** (cancelamento lógico sem exclusão física). O professor pode consultar as correções anteriores, mas a interface não exibe os registros cancelados como avaliações válidas.
+
+**API exclusiva do professor responsável:** `GET/POST /api/students/:id/assessments`, `PUT/DELETE /api/students/:id/assessments/:assessmentId` e `GET /api/students/:id/assessments/:assessmentId/changes`. O backend valida datas, unidades, comprimento dos campos, precisão do valor e vínculo aluno–professor. As correções ficam na tabela `functional_assessment_changes`; avaliações na `functional_assessments`.
+
+**Atenção à privacidade:** avaliações funcionais podem conter dados pessoais sensíveis de saúde. Este módulo é destinado a **dados sintéticos e testes** enquanto não forem implantados e verificados mecanismos de segurança, políticas de acesso, retenção, recuperação, exportação, consentimento/base legal e demais obrigações da LGPD. Cancelamento lógico **não equivale à exclusão definitiva dos dados**: o histórico de auditoria ainda os conserva. Não utilizar com dados reais neste estágio.
 
 ## Relatórios de frequência e atividades
 
