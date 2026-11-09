@@ -16,12 +16,17 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [students, setStudents] = useState([]);
   const [quota, setQuota] = useState({ activeStudents: 0, maxStudents: 20 });
+  const [myPlan, setMyPlan] = useState(null);
   const [studentName, setStudentName] = useState('');
 
   const refreshStudents = useCallback(async () => {
-    const result = await api('/api/students');
+    const [result, planInfo] = await Promise.all([
+      api('/api/students'),
+      api('/api/account/plan'),
+    ]);
     setStudents(result.students);
     setQuota(result.quota);
+    setMyPlan(planInfo.plan);
   }, []);
 
   useEffect(() => {
@@ -77,6 +82,7 @@ function App() {
       await api('/api/auth/logout', { method: 'POST' });
       setTeacher(null);
       setStudents([]);
+      setMyPlan(null);
       setSelectedId(null);
       setTab('students');
     } catch (err) { setError(err.message); }
@@ -153,6 +159,10 @@ function App() {
                       <div className="eyebrow">Painel do professor</div>
                       <h1>Olá, {teacher.name.split(' ')[0]}!</h1>
                       <p className="muted">Selecione um aluno para ver sua ficha e seu plano de atividades.</p>
+                      <p className="muted">
+                        {myPlan ? 'Plano vinculado: ' + myPlan.name + ' (atribuição manual; sem cobrança Pix)' :
+                          'Sem plano comercial atribuído; vale o limite individual configurado pela administração.'}
+                      </p>
                     </div>
                     <div className="stat">
                       <strong>{quota.activeStudents} / {quota.maxStudents}</strong>
