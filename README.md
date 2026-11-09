@@ -44,6 +44,9 @@ npm test
 - [x] Cadastro e listagem de alunos associados ao professor autenticado
 - [x] Ficha do aluno: nome preferido, nascimento, contato, contato de emergência, objetivos e observações gerais
 - [x] Exercícios atribuídos individualmente e registros **manuais** de realização
+- [x] Biblioteca privada e editável de exercícios por professor, com pesquisa e arquivamento
+- [x] Planejamento semanal por aluno (segunda a domingo), duração opcional e edição de prescrições
+- [x] Compatibilidade com exercícios antigos em texto livre, sem apagar os registros de realização
 - [x] Administração: ver professores, ativar/desativar contas e definir máximo de alunos ativos
 - [x] Dashboard administrativo com totais de professores, alunos e atividades
 - [x] Histórico auditável das alterações de limites e situação das contas
@@ -56,7 +59,7 @@ npm test
 - [x] Bloqueio de novos alunos, reativações e novas prescrições quando o prazo não está ativo (sem apagar fichas)
 - [x] Painel de Vigências com status ativo, agendado, vencido ou revogado e métricas agregadas
 - [x] Limite inicial de **20 alunos ativos** por professor, editável pelo administrador (0 a 10.000)
-- [ ] Turmas, avaliações funcionais, prescrição por tempo e relatórios mais completos
+- [ ] Turmas, avaliações funcionais, aulas com duração e relatórios de evolução mais completos
 - [ ] Integração com o catálogo do [openGym](https://github.com/DuarteSantos8/openGym)
 - [x] Pix Asaas Sandbox: cobrança, QR dinâmico, Pix Copia e Cola, webhook autenticado e conciliação idempotente
 - [x] Renovação de vigência após pagamento verificado em sandbox, sem sobrescrever revogação administrativa
@@ -77,6 +80,20 @@ npm test
 ## Licença
 
 AGPL-3.0-or-later, conforme o arquivo `LICENSE`. Ao disponibilizar uma versão modificada pela rede, observe as obrigações de disponibilização de código-fonte da AGPL.
+
+## Biblioteca de exercícios e planejamento semanal
+
+Na área do professor, acesse **Biblioteca de exercícios** para cadastrar exercícios com nome, categoria, orientações gerais, séries e repetições padrão, e duração opcional em minutos. Também é possível editar ou arquivar exercícios. Cada professor tem uma biblioteca **privada**: uma conta não pode ver nem utilizar itens de outra conta.
+
+Abra **Meus alunos → ficha individual → Prescrever atividade**. Você pode escolher um exercício do catálogo ou criar uma atividade livre apenas para aquele aluno, ajustar séries/repetições/duração, selecionar os dias da semana e adicionar instruções personalizadas. O quadro **Planejamento semanal** mostra as atividades de segunda a domingo. Você também pode editar uma prescrição existente. Alterações na biblioteca **não reescrevem** prescrições já atribuídas, para preservar a decisão anterior do professor. O arquivamento de um exercício impede novas atribuições, mas não apaga planos nem históricos existentes.
+
+As prescrições antigas que usavam o campo de frequência em texto permanecem intactas, com dias estruturados vazios até que o professor os defina. Os registros de realização continuam manuais. Duração é uma informação adicional, não um cronômetro ou monitoramento automático; séries e repetições seguem obrigatórios nesta versão.
+
+**Este módulo não importa o acervo original do openGym.** A biblioteca criada aqui é autoral e preenchida pelo professor. A eventual adaptação dos exercícios e mídias do openGym exigirá revisão específica da estrutura de dados, créditos e licença AGPL.
+
+**API:** `GET/POST /api/exercises/library`, `PUT /api/exercises/library/:id`, `POST /api/students/:id/exercises`, `PATCH /api/students/:id/exercises/:exerciseId`. Os demais endpoints de ficha, conclusão e exclusão continuam disponíveis. Todas as consultas e modificações validam a propriedade do professor no servidor. Novas prescrições e edição de planos seguem as restrições de vigência de acesso. Os dias são armazenados como máscara binária (1=segunda, 7=domingo) com validação de valores e duplicatas.
+
+**Atenção:** o software não prescreve atividades automaticamente e não substitui avaliação por profissional habilitado. Não utilizar dados clínicos reais antes da revisão de segurança, acessibilidade e conformidade à LGPD.
 
 ## Administração e proteção dos alunos
 
