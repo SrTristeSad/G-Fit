@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
+import StudentWorkouts from './StudentWorkouts.jsx';
 
 const blank = {
   name: '', preferredName: '', dateOfBirth: '', phone: '',
@@ -24,9 +25,6 @@ function age(date) {
 export default function StudentProfile({ id, onBack, onChanged }) {
   const [data, setData] = useState(null);
   const [form, setForm] = useState(blank);
-  const [exercise, setExercise] = useState({
-    title: '', sets: 2, repetitions: 10, schedule: '', instructions: '',
-  });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -56,24 +54,9 @@ export default function StudentProfile({ id, onBack, onChanged }) {
   function edit(key, value) {
     setForm(current => ({ ...current, [key]: value }));
   }
-  function changeExercise(key, value) {
-    setExercise(current => ({ ...current, [key]: value }));
-  }
   async function saveProfile(event) {
     event.preventDefault();
     await run(() => api('/api/students/' + id, { method: 'PUT', body: JSON.stringify(form) }));
-  }
-  async function addExercise(event) {
-    event.preventDefault();
-    await run(async () => {
-      await api('/api/students/' + id + '/exercises', {
-        method: 'POST',
-        body: JSON.stringify({
-          ...exercise, sets: Number(exercise.sets), repetitions: Number(exercise.repetitions),
-        }),
-      });
-      setExercise({ title: '', sets: 2, repetitions: 10, schedule: '', instructions: '' });
-    });
   }
   async function setActive(active) {
     await run(() => api('/api/students/' + id + '/status', {
@@ -140,62 +123,7 @@ export default function StudentProfile({ id, onBack, onChanged }) {
               <button className="primary" disabled={busy}>Salvar ficha</button>
             </form>
           </section>
-          <div className="columns">
-            <section className="card">
-              <h2>Atividades deste aluno</h2>
-              <p className="muted">Prescrições individuais do professor, com registros manuais de realização.</p>
-              {data.exercises.length === 0 ? <p className="muted">Nenhuma atividade atribuída.</p> :
-                <ul className="exercise-list">
-                  {data.exercises.map(item => (
-                    <li key={item.id}>
-                      <strong>{item.title}</strong>
-                      <span>{item.sets} séries × {item.repetitions} repetições</span>
-                      {item.schedule && <span>Frequência: {item.schedule}</span>}
-                      {item.instructions && <small>{item.instructions}</small>}
-                      <span className="muted">
-                        Conclusões registradas: {item.completedCount}
-                        {item.lastCompletedAt && ' · Última: ' + new Date(item.lastCompletedAt).toLocaleDateString('pt-BR')}
-                      </span>
-                      <div className="actions">
-                        <button type="button" className="secondary-light" disabled={busy || !data.student.active}
-                          onClick={() => run(() => api('/api/students/' + id + '/exercises/' + item.id + '/complete', { method: 'POST' }))}>
-                          Registrar realização
-                        </button>
-                        <button type="button" className="danger-light" disabled={busy}
-                          onClick={() => {
-                            if (window.confirm('Remover esta atividade e seus registros de realização?')) {
-                              run(() => api('/api/students/' + id + '/exercises/' + item.id, { method: 'DELETE' }));
-                            }
-                          }}>Excluir</button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>}
-            </section>
-            <section className="card">
-              <h2>Prescrever atividade</h2>
-              <form onSubmit={addExercise}>
-                <label>Nome do exercício<input required maxLength="120" minLength="2"
-                  value={exercise.title} onChange={e => changeExercise('title', e.target.value)}
-                  placeholder="Ex.: caminhada acompanhada" /></label>
-                <div className="form-grid">
-                  <label>Séries<input type="number" min="1" max="30" required
-                    value={exercise.sets} onChange={e => changeExercise('sets', e.target.value)} /></label>
-                  <label>Repetições<input type="number" min="1" max="500" required
-                    value={exercise.repetitions} onChange={e => changeExercise('repetitions', e.target.value)} /></label>
-                </div>
-                <label>Frequência / dias<input maxLength="120"
-                  value={exercise.schedule} onChange={e => changeExercise('schedule', e.target.value)}
-                  placeholder="Ex.: segunda e quinta" /></label>
-                <label>Orientações do professor<textarea rows="3" maxLength="1000"
-                  value={exercise.instructions} onChange={e => changeExercise('instructions', e.target.value)} /></label>
-                <button className="primary" disabled={busy || !data.student.active}>
-                  Adicionar atividade
-                </button>
-              </form>
-              <p className="notice">O profissional é responsável por adaptar a prescrição às condições do aluno. O sistema não recomenda exercícios automaticamente.</p>
-            </section>
-          </div>
+          <StudentWorkouts id={id} data={data} run={run} busy={busy} />
         </>
       )}
     </div>
