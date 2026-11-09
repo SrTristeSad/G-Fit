@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validCustomerId, validPaymentId, validBillDate, centsToValue,
-  matchesPaidCharge, validWebhookToken, createAsaasCharge,
+  matchesPaidCharge, matchesChargeIdentity, summarizeRefunds, isDeletedPayment,
+  validWebhookToken, createAsaasCharge,
 } from '../src/asaas.js';
 
 test('validacao de identificadores, datas e valores monetarios em centavos', () => {
@@ -78,4 +79,41 @@ test('token do webhook usa comparacao estrita e chave da API nao chega ao navega
     if (beforeMock === undefined) delete process.env.ASAAS_TEST_BASE_URL;
     else process.env.ASAAS_TEST_BASE_URL = beforeMock;
   }
+});
+
+
+test('reembolsos somam apenas devoluções DONE e não geram crédito duplicado', () => {
+  const base = { status: 'RECEIVED', refunds: [] };
+  assert.deepEqual(summarizeRefunds(base, 2990), { state: 'none', refundedCents: 0 });
+  assert.deepEqual(summarizeRefunds({
+    refunds: [{ status: 'PENDING', value: 9.9 }],
+  }, 2990), { state: 'pending', refundedCents: 0 });
+  assert.deepEqual(summarizeRefunds({
+    refunds: [{ status: 'DONE', value: 9.9 }, { status: 'PENDING', value: 20 }],
+  }, 2990), { state: 'partial', refundedCents: 990 });
+  assert.deepEqual(summarizeRefunds({
+    refunds: [{ status: 'DONE', value: 9.9 }, { status: 'DONE', value: 20 }],
+  }, 2990), { state: 'full', refundedCents: 2990 });
+  assert.equal(summarizeRefunds({ refunds: [{ status: 'DONE', value: 300 }] }, 2990).state, 'review');
+  assert.equal(summarizeRefunds({ status: 'REFUNDED' }, 2990).state, 'review');
+  assert.equal(summarizeRefunds({ refunds: [{ status: 'DONE', value: 1.001 }] }, 2990).state, 'review');
+});
+
+test('exclusão remota e identidade são distintas de pagamento confirmado', () => {
+  const charge = {
+    id: 'fcaa0e03-44fa-4601-b844-8f129e9e5011',
+    provider_payment_id: 'pay_test_000001',
+    amount_cents: 2990,
+    asaas_customer_id: 'cus_0000001',
+  };
+  const remote = {
+    id: charge.provider_payment_id, externalReference: charge.id,
+    customer: charge.asaas_customer_id, value: 29.9, billingType: 'PIX',
+    status: 'DELETED', deleted: true,
+  };
+  assert.equal(matchesChargeIdentity(remote, charge), true);
+  assert.equal(matchesPaidCharge(remote, charge), false);
+  assert.equal(isDeletedPayment(remote), true);
+  assert.equal(matchesChargeIdentity({ ...remote, value: 29.91 }, charge), false);
+  assert.equal(isDeletedPayment({ ...remote, status: 'PENDING', deleted: false }), false);
 });
