@@ -73,6 +73,12 @@ assert.equal((await request('/api/admin/teachers/' + teacherId + '/asaas-custome
   method: 'PUT', cookie: ca, body: { customerId: 'cus_TEST_00001' },
 })).status, 200);
 
+const today = new Date().toISOString().slice(0, 10);
+const future = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+const firstGrant = await request('/api/admin/teachers/' + teacherId + '/access', {
+  method: 'PUT', cookie: ca, body: { startsOn: today, endsOn: future },
+});
+assert.equal(firstGrant.status, 200);
 const first = await request('/api/account/pix-charge', {
   method: 'POST', cookie: ct, body: {},
 });
@@ -96,6 +102,13 @@ const premature = await webhook('evt_before_paid_000001', providerId);
 assert.equal(premature.status, 503);
 assert.equal((await request('/api/account/charges', { cookie: ct })).data.charges[0].status, 'pending');
 
+const revokeBeforePayment = await request('/api/admin/teachers/' + teacherId + '/access/revoke', {
+  method: 'POST', cookie: ca,
+});
+assert.equal(revokeBeforePayment.status, 200);
+assert.equal((await request('/api/account/pix-charge', {
+  method: 'POST', cookie: ct, body: {},
+})).status, 409);
 await mockPaid(providerId);
 const paid = await webhook('evt_paid_000001', providerId);
 assert.equal(paid.status, 200, JSON.stringify(paid.data));
@@ -107,8 +120,6 @@ assert.equal(paidAgain.data.duplicate, true);
 assert.equal((await request('/api/account/charges', { cookie: ct })).data.charges[0].status, 'paid');
 assert.equal((await request('/api/account/access', { cookie: ct })).data.access.status, 'revoked');
 
-const today = new Date().toISOString().slice(0, 10);
-const future = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
 const grant = await request('/api/admin/teachers/' + teacherId + '/access', {
   method: 'PUT', cookie: ca, body: { startsOn: today, endsOn: future },
 });
