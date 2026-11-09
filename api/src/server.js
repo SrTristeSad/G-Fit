@@ -5,6 +5,7 @@ import { rateLimit } from 'express-rate-limit';
 import { randomUUID } from 'node:crypto';
 import { db, initDatabase } from './db.js';
 import { registerAdminReadRoutes } from './admin.js';
+import { registerPlanRoutes } from './plans.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -161,9 +162,12 @@ app.get('/api/admin/teachers', requireTeacher, requireAdmin, async (_req, res) =
   const result = await db.query(
     'SELECT t.id, t.full_name AS name, t.email, t.is_admin AS "isAdmin", ' +
     't.is_active AS "isActive", t.max_students AS "maxStudents", t.created_at AS "createdAt", ' +
-    'COUNT(s.id) FILTER (WHERE s.is_active) ::INTEGER AS "activeStudents" ' +
+    'COUNT(s.id) FILTER (WHERE s.is_active) ::INTEGER AS "activeStudents", ' +
+    'a.plan_id AS "planId", p.name AS "planName" ' +
     'FROM teachers t LEFT JOIN students s ON s.teacher_id = t.id ' +
-    'GROUP BY t.id ORDER BY t.created_at DESC',
+    'LEFT JOIN teacher_plan_assignments a ON a.teacher_id=t.id ' +
+    'LEFT JOIN plans p ON p.id=a.plan_id ' +
+    'GROUP BY t.id, a.plan_id, p.name ORDER BY t.created_at DESC',
   );
   res.json({ teachers: result.rows });
 });
@@ -223,6 +227,7 @@ app.patch('/api/admin/teachers/:id', requireTeacher, requireAdmin, async (req, r
 });
 
 registerAdminReadRoutes(app, requireTeacher, requireAdmin);
+registerPlanRoutes(app, requireTeacher, requireAdmin);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
