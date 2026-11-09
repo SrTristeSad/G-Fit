@@ -90,3 +90,40 @@ footer { text-align: center; padding: 22px; color: #738478; font-size: 13px; }
   .card { padding: 22px; }
   .auth { margin: 12px auto; }
 }
+
+/* Painéis do professor e administrador */
+.stack { display: grid; gap: 22px; }
+.section-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.header-actions { display: flex; align-items: center; gap: 15px; }
+.header-name { color: #d4e3dc; font-size: 14px; }
+.tabs { display: flex; gap: 8px; margin: -12px 0 32px; border-bottom: 1px solid #d7e4db; }
+.tabs button { border: 0; border-bottom: 3px solid transparent; padding: 15px 18px; background: transparent; font-weight: 750; color: #62796d; }
+.tabs button.active { color: #135f42; border-color: #135f42; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+textarea { width: 100%; font: inherit; font-size: 16px; min-height: 85px; padding: 12px; resize: vertical; border: 1px solid #bfc9c0; border-radius: 10px; color: #183329; }
+textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
+.secondary-light, .danger-light { border: 1px solid #b8c9bc; background: white; color: #135f42; border-radius: 10px; padding: 11px 15px; font-weight: 700; min-height: 43px; }
+.danger-light { color: #a63232; border-color: #dfbfbf; }
+.student-link { background: none; border: 0; color: #124d33; font-size: 16px; font-weight: 700; padding: 0; text-align: left; flex: 1; }
+.student-link:hover { text-decoration: underline; }
+.student-link small { display: block; color: #64776c; font-size: 12px; margin-top: 3px; font-weight: 500; }
+.tag { border-radius: 20px; padding: 3px 9px; background: #e4eae3; color: #586b60; font-size: 11px; margin-left: 6px; }
+.exercise-list { list-style: none; padding: 0; }
+.exercise-list li { display: grid; gap: 7px; border-bottom: 1px solid #e6ece7; padding: 15px 0; }
+.exercise-list span, .exercise-list small { color: #64776c; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 6px 0; }
+.teacher-list { display: grid; gap: 8px; margin-top: 24px; }
+.teacher-record { border: 1px solid #e2e9e4; border-radius: 14px; padding: 16px; display: grid; gap: 12px; }
+.teacher-record > div:first-child { display: grid; gap: 4px; }
+.teacher-record .tag { display: inline-block; width: fit-content; margin-left: 0; }
+.teacher-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+.teacher-controls > span { font-size: 14px; color: #64776c; margin-right: auto; }
+.teacher-controls label { width: 105px; }
+.teacher-controls label input[type=number] { padding: 10px; }
+.teacher-controls .checkline { display: flex; gap: 8px; align-items: center; height: 42px; width: auto; }
+.teacher-controls .checkline input { width: 18px; height: 18px; }
+@media (max-width: 700px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .header-name { display: none; }
+  .teacher-controls { align-items: center; }
+}
