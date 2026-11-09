@@ -128,4 +128,66 @@ assert.equal((await request('/api/auth/login', {
 assert.equal((await request('/api/admin/teachers/' + admin.data.teacher.id, {
   method: 'PATCH', cookie: ca, body: { isActive: false },
 })).status, 400);
-console.log('E2E G Fit: autenticação, permissões, cotas, fichas e exercícios OK');
+
+// Planos: apenas administrador configura e vincula. Nao representam pagamentos.
+assert.equal((await request('/api/admin/plans', { cookie: c1 })).status, 403);
+const plansEmpty = await request('/api/admin/plans', { cookie: ca });
+assert.equal(plansEmpty.status, 200);
+assert.deepEqual(plansEmpty.data.plans, []);
+const invalidPlan = await request('/api/admin/plans', {
+  method: 'POST', cookie: ca,
+  body: { name: 'X', priceCents: -10, billingCycle: 'monthly', maxStudents: -1 },
+});
+assert.equal(invalidPlan.status, 400);
+const createdPlan = await request('/api/admin/plans', {
+  method: 'POST', cookie: ca,
+  body: {
+    name: 'Profissional 30', description: 'Plano mensal de teste',
+    priceCents: 2990, billingCycle: 'monthly', maxStudents: 3,
+  },
+});
+assert.equal(createdPlan.status, 201, JSON.stringify(createdPlan.data));
+const planId = createdPlan.data.plan.id;
+assert.equal(createdPlan.data.plan.priceCents, 2990);
+assert.equal((await request('/api/admin/plans', {
+  method: 'POST', cookie: ca,
+  body: { name: 'profissional 30', priceCents: 2990, billingCycle: 'monthly', maxStudents: 3 },
+})).status, 409);
+const assign = await request('/api/admin/teachers/' + teacher1.id + '/plan', {
+  method: 'PUT', cookie: ca, body: { planId },
+});
+assert.equal(assign.status, 200, JSON.stringify(assign.data));
+assert.equal(assign.data.maxStudents, 3);
+assert.equal(assign.data.assignment, 'manual');
+const ownPlan = await request('/api/account/plan', { cookie: c1 });
+assert.equal(ownPlan.status, 200, JSON.stringify(ownPlan.data));
+assert.equal(ownPlan.data.plan.id, planId);
+assert.equal(ownPlan.data.billingConnected, false);
+assert.equal((await request('/api/students', { cookie: c1 })).data.quota.maxStudents, 3);
+const plansWithAssignment = await request('/api/admin/plans', { cookie: ca });
+assert.equal(plansWithAssignment.data.plans[0].assignedTeachers, 1);
+const accountList = await request('/api/admin/teachers', { cookie: ca });
+assert.equal(accountList.data.teachers.find(t => t.id === teacher1.id).planName, 'Profissional 30');
+const disablePlan = await request('/api/admin/plans/' + planId, {
+  method: 'PATCH', cookie: ca, body: { isActive: false },
+});
+assert.equal(disablePlan.status, 200);
+assert.equal((await request('/api/admin/teachers/' + teacher2.id + '/plan', {
+  method: 'PUT', cookie: ca, body: { planId },
+})).status, 409);
+assert.equal((await request('/api/account/plan', { cookie: c1 })).data.plan.id, planId);
+const unassign = await request('/api/admin/teachers/' + teacher1.id + '/plan', {
+  method: 'DELETE', cookie: ca,
+});
+assert.equal(unassign.status, 200);
+assert.equal(unassign.data.maxStudents, 3);
+assert.equal((await request('/api/account/plan', { cookie: c1 })).data.plan, null);
+assert.equal((await request('/api/students', { cookie: c1 })).data.quota.maxStudents, 3);
+const planAudit = await request('/api/admin/audit', { cookie: ca });
+assert.equal(planAudit.status, 200);
+const auditActions = planAudit.data.events.map(event => event.action);
+for (const action of ['plan.created', 'teacher.plan.assigned', 'plan.status.updated', 'teacher.plan.removed']) {
+  assert.ok(auditActions.includes(action), 'Evento ausente: ' + action);
+}
+console.log('E2E G Fit: contas, turmas futuras, fichas, administracao e planos manuais OK');
+
