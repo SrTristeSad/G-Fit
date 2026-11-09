@@ -326,4 +326,61 @@ assert.ok(operations.data.eventsToReview.some(e => e.resolution === 'mismatch'))
 assert.ok(Array.isArray(operations.data.chargesToReview));
 console.log('Monitoramento: acesso administrativo, falhas HTTP, tentativas repetidas e divergências OK.');
 
+// Alertas automáticos: são internos e não alteram pagamentos.
+assert.equal((await request('/api/admin/alerts', { cookie: ct })).status, 403);
+assert.equal((await request('/api/admin/alerts/scan', { method: 'POST', cookie: ct })).status, 403);
+const scan = await request('/api/admin/alerts/scan', { method: 'POST', cookie: ca });
+assert.equal(scan.status, 200, JSON.stringify(scan.data));
+assert.equal(scan.data.sandbox, true);
+let inbox = await request('/api/admin/alerts', { cookie: ca });
+assert.equal(inbox.status, 200, JSON.stringify(inbox.data));
+assert.equal(inbox.data.delivery, 'in_app_only');
+assert.ok(inbox.data.scanner.lastSuccessAt);
+assert.ok(inbox.data.summary.open >= 2);
+const failure = inbox.data.alerts.find(a => a.alertType === 'webhook_failure' &&
+  a.sourceKey === 'evt_before_paid_000001');
+assert.ok(failure);
+assert.equal(failure.status, 'open');
+const divergence = inbox.data.alerts.find(a => a.alertType === 'webhook_divergence' &&
+  a.sourceKey === 'evt_mismatch_000003');
+assert.ok(divergence);
+assert.equal(divergence.status, 'open');
+const alertId = failure.id;
+const acknowledge = await request('/api/admin/alerts/' + alertId + '/acknowledge', {
+  method: 'PATCH', cookie: ca,
+});
+assert.equal(acknowledge.status, 200, JSON.stringify(acknowledge.data));
+assert.equal(acknowledge.data.acknowledged, true);
+assert.equal((await request('/api/admin/alerts/' + alertId + '/acknowledge', {
+  method: 'PATCH', cookie: ca,
+})).data.unchanged, true);
+assert.equal((await request('/api/admin/alerts/' + alertId + '/acknowledge', {
+  method: 'PATCH', cookie: ct,
+})).status, 403);
+const scanAgain = await request('/api/admin/alerts/scan', { method: 'POST', cookie: ca });
+assert.equal(scanAgain.status, 200);
+inbox = await request('/api/admin/alerts', { cookie: ca });
+assert.equal(inbox.data.alerts.find(a => a.id === alertId).status, 'acknowledged');
+assert.equal(inbox.data.alerts.filter(a => a.sourceKey === 'evt_mismatch_000003' &&
+  a.alertType === 'webhook_divergence').length, 1);
+
+// Resolve a falha da última tentativa ao reentregar o mesmo evento, agora com pagamento confirmado.
+const retryOldEvent = await webhook('evt_before_paid_000001', providerId);
+assert.equal(retryOldEvent.status, 200, JSON.stringify(retryOldEvent.data));
+const resolveScan = await request('/api/admin/alerts/scan', { method: 'POST', cookie: ca });
+assert.equal(resolveScan.status, 200);
+inbox = await request('/api/admin/alerts', { cookie: ca });
+const resolvedAlert = inbox.data.alerts.find(a => a.id === alertId);
+assert.equal(resolvedAlert.status, 'resolved');
+assert.ok(resolvedAlert.resolvedAt);
+assert.equal((await request('/api/admin/alerts/' + alertId + '/acknowledge', {
+  method: 'PATCH', cookie: ca,
+})).status, 409);
+assert.ok(inbox.data.summary.resolved >= 1);
+assert.ok(inbox.data.summary.open >= 1);
+const auditAlerts = await request('/api/admin/audit', { cookie: ca });
+assert.ok(auditAlerts.data.events.some(e => e.action === 'billing.alert.acknowledged'));
+console.log('Alertas: deduplicação, reconhecimento, resolução e permissões OK.');
+
+
 
