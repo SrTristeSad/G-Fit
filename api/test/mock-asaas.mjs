@@ -34,7 +34,13 @@ const server = createServer(async (req, res) => {
         status: 'PENDING',
       };
       payments.set(id, record);
+      if (body.customer === 'cus_FAIL_ONCE') return send(res, 500, { error: 'Simulated lost creation response' });
       return send(res, 200, record);
+    }
+    if (req.method === 'GET' && path === '/v3/payments') {
+      const ref = new URL(req.url, 'http://localhost').searchParams.get('externalReference');
+      const data = [...payments.values()].filter(item => item.externalReference === ref);
+      return send(res, 200, { data, hasMore: false, totalCount: data.length });
     }
     if (req.method === 'GET' && /^\/v3\/payments\/pay_[A-Za-z0-9_-]+$/.test(path)) {
       const id = path.split('/')[3];
