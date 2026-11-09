@@ -65,6 +65,15 @@ jobs:
           ADMIN_PASSWORD="$(sed -n 's/^Password: //p' /tmp/gfit-admin.txt)"
           test -n "$ADMIN_PASSWORD"
           node api/test/e2e.mjs
+          # O rate limiter em memória não deve fazer uma suíte bloquear a outra.
+          # Reiniciar somente a API também valida migrações repetidas e preservação do banco.
+          docker compose restart api
+          ready=0
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:8080/api/health > /dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          test "$ready" = "1"
           node api/test/workouts-e2e.mjs
           node api/test/pix-e2e.mjs
           if docker compose exec -T api node src/bootstrap-admin.js outro@example.com > /dev/null 2>&1; then
