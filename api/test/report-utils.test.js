@@ -14,7 +14,7 @@ test('report date ranges are strict, UTC-based and capped at 366 days',()=>{
   assert.deepEqual(parseReportRange('2026-11-01','2026-11-01'),{
     from:'2026-11-01',to:'2026-11-01',days:1,timezone:'UTC',
   });
-  assert.equal(parseReportRange('2026-01-01','2027-01-01'),null);
+  assert.equal(parseReportRange('2026-01-01','2027-01-02'),null);
   assert.equal(parseReportRange('2026-03-01','2026-02-01'),null);
   assert.equal(parseReportRange('2026-02-30','2026-03-01'),null);
   assert.equal(parseReportRange(undefined,'2026-03-01'),null);
