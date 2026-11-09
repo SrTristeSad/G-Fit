@@ -199,3 +199,15 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
 .pix-qr textarea { font-family:ui-monospace,monospace; word-break:break-all; resize:vertical; }
 .billing-charge .saved-message { font-weight:700; }
 @media(max-width:700px) {.billing-form label,.billing-form button{width:100%;}}
+
+
+/* Alertas automáticos internos: interface de acompanhamento, sem e-mail externo. */
+.alert-list { display:grid; gap:14px; margin:16px 0; }
+.alert-record { display:grid; gap:10px; padding:17px; border:1px solid #dae5de; border-radius:14px; background:#fbfdfb; }
+.alert-record .section-heading { gap:10px; align-items:flex-start; }
+.alert-record p { margin:0; }
+.alert-record small { overflow-wrap:anywhere; }
+.alert-record button { justify-self:start; }
+.card .section-heading > label { min-width:175px; }
+.card .section-heading > label select { display:block; width:100%; min-height:44px; border:1px solid #bfc9c0; border-radius:9px; background:white; padding:10px; font:inherit; color:#183329; }
+@media(max-width:700px) { .card .section-heading > label { width:100%; } .alert-record button { width:100%; } }
