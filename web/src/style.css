@@ -265,3 +265,63 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
   .session-list,.attendance-grid { grid-template-columns:1fr; }
   .inline-class-form label,.inline-class-form button { width:100%; }
 }
+
+
+/* Relatórios operacionais: frequência registrada e atividade manual, sem diagnóstico */
+.report-page { gap:22px; }
+.report-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) auto;
+  gap:12px; align-items:end; }
+.report-filters button { min-height:48px; }
+.report-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+.report-stat { padding:18px; border:1px solid #dce7dd; background:#f9fcf9;
+  border-radius:14px; display:grid; gap:7px; align-content:start; }
+.report-stat span { color:#486656; font-weight:650; font-size:13px; }
+.report-stat strong { font-size:26px; color:#155a3a; overflow-wrap:anywhere; line-height:1.2; }
+.report-stat small { color:#64766a; line-height:1.4; }
+.report-trend { padding:22px; background:white; border:1px solid #e2e8e1; border-radius:17px; }
+.report-trend h3 { margin:0 0 6px; }
+.report-trend-grid { display:grid; gap:12px; margin:18px 0; }
+.report-trend-row { display:grid; grid-template-columns:74px minmax(120px,1fr) minmax(175px,230px);
+  align-items:center; gap:14px; }
+.report-trend-row>strong { font-size:13px; color:#245a3a; }
+.report-trend-row small { font-size:12px; color:#607467; }
+.report-trend-bars { display:grid; gap:5px; }
+.report-track { width:100%; height:10px; background:#e8eee9; border-radius:20px; overflow:hidden; }
+.report-bar { height:100%; min-width:0; border-radius:20px; }
+.report-bar-present { background:#218353; }
+.report-bar-activity { background:#5d7bbd; }
+.report-legend { display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:#536b5b; }
+.report-legend span { display:flex; align-items:center; gap:6px; }
+.report-swatch { display:inline-block; width:12px; height:12px; border-radius:3px; }
+.report-swatch-present { background:#218353; }
+.report-swatch-activity { background:#5d7bbd; }
+.report-section-heading { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; }
+.report-section-heading h2 { margin:0; }
+.report-table-wrap { width:100%; overflow-x:auto; }
+.report-table { width:100%; border-collapse:collapse; text-align:left; font-size:13px; }
+.report-table th,.report-table td { padding:11px 10px; border-bottom:1px solid #e1eae2; }
+.report-table th { color:#435c4b; font-weight:750; white-space:nowrap; background:#f5faf5; }
+.report-table td { overflow-wrap:anywhere; }
+.report-table tbody tr:hover { background:#f9fcf9; }
+.report-student-link { color:#176444; background:transparent; border:0; padding:4px 0;
+  font-weight:700; text-align:left; text-decoration:underline; }
+.report-activity-list { padding:0; list-style:none; display:grid; gap:10px; }
+.report-activity-list li { display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between;
+  padding-bottom:10px; border-bottom:1px solid #e4eee5; }
+.report-activity-list strong { color:#176444; white-space:nowrap; }
+@media(max-width:800px){
+  .report-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .report-trend-row { grid-template-columns:74px minmax(100px,1fr); }
+  .report-trend-row small { grid-column:2; }
+}
+@media(max-width:560px){
+  .report-filters { grid-template-columns:1fr; }
+  .report-trend-row { grid-template-columns:60px minmax(90px,1fr); gap:8px; }
+}
+@media print {
+  nav.tabs,.topbar button,.report-filters,.report-page .actions,footer { display:none!important; }
+  body,:root { background:white!important; }
+  main { margin:0; width:100%; }
+  .card,.report-trend { box-shadow:none; break-inside:avoid; }
+  .report-page { font-size:11px; }
+}
