@@ -8,6 +8,7 @@ import { registerAdminReadRoutes } from './admin.js';
 import { registerPlanRoutes } from './plans.js';
 import { registerAccessRoutes, requireAccessForNewActivity } from './access.js';
 import { registerBillingRoutes } from './billing.js';
+import { registerAdminAlertRoutes, startAdminAlertScanner } from './admin-alerts.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -232,6 +233,7 @@ registerAdminReadRoutes(app, requireTeacher, requireAdmin);
 registerPlanRoutes(app, requireTeacher, requireAdmin);
 registerAccessRoutes(app, requireTeacher, requireAdmin);
 registerBillingRoutes(app, requireTeacher, requireAdmin, rateLimit);
+registerAdminAlertRoutes(app, requireTeacher, requireAdmin, rateLimit);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
@@ -401,5 +403,6 @@ app.use((error, _req, res, _next) => {
 });
 
 await initDatabase();
+startAdminAlertScanner();
 const port = Number(process.env.PORT || 3001);
 app.listen(port, '0.0.0.0', () => console.log('G Fit API iniciada na porta', port));
