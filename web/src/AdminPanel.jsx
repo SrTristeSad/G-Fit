@@ -4,6 +4,7 @@ import PlansPanel from './PlansPanel.jsx';
 import AccessPanel from './AccessPanel.jsx';
 import BillingPanel from './BillingPanel.jsx';
 import BillingOperations from './BillingOperations.jsx';
+import AdminAlerts from './AdminAlerts.jsx';
 
 function Stat({ label, value, caption }) {
   return (
@@ -191,6 +192,7 @@ export default function AdminPanel() {
   const [teachers, setTeachers] = useState([]);
   const [plans, setPlans] = useState([]);
   const [accessTerms, setAccessTerms] = useState([]);
+  const [alertsSummary, setAlertsSummary] = useState({ open: 0, acknowledged: 0 });
   const [overview, setOverview] = useState(null);
   const [billing, setBilling] = useState(null);
   const [events, setEvents] = useState([]);
@@ -201,12 +203,13 @@ export default function AdminPanel() {
   const [error, setError] = useState('');
 
   const refresh = useCallback(async () => {
-    const [accounts, dashboard, audit, planList, accessList] = await Promise.all([
+    const [accounts, dashboard, audit, planList, accessList, alerts] = await Promise.all([
       api('/api/admin/teachers'),
       api('/api/admin/dashboard'),
       api('/api/admin/audit'),
       api('/api/admin/plans'),
       api('/api/admin/access'),
+      api('/api/admin/alerts'),
     ]);
     setTeachers(accounts.teachers);
     setOverview(dashboard.overview);
@@ -214,6 +217,7 @@ export default function AdminPanel() {
     setEvents(audit.events);
     setPlans(planList.plans);
     setAccessTerms(accessList.accessTerms);
+    setAlertsSummary(alerts.summary);
   }, []);
 
   useEffect(() => {
@@ -269,6 +273,9 @@ export default function AdminPanel() {
         <button className={view === 'operations' ? 'active' : ''} onClick={() => setView('operations')}>
           Monitoramento
         </button>
+        <button className={view === 'alerts' ? 'active' : ''} onClick={() => setView('alerts')}>
+          Alertas{alertsSummary.open > 0 ? ' (' + alertsSummary.open + ')' : ''}
+        </button>
         <button className={view === 'audit' ? 'active' : ''} onClick={() => setView('audit')}>
           Histórico
         </button>
@@ -289,6 +296,7 @@ export default function AdminPanel() {
             <Stat label="Prazos ativos (manual)" value={overview?.manualAccessActive ?? '—'} />
             <Stat label="Prazos vencidos (manual)" value={overview?.manualAccessExpired ?? '—'} />
             <Stat label="Prazos agendados (manual)" value={overview?.manualAccessScheduled ?? '—'} />
+            <Stat label="Alertas abertos" value={alertsSummary.open ?? '—'} />
           </div>
           <div className="columns">
             <div className="card">
@@ -344,6 +352,7 @@ export default function AdminPanel() {
       {view === 'access' && <AccessPanel teachers={teachers} accessTerms={accessTerms} refresh={reload} />}
       {view === 'billing' && <BillingPanel admin teachers={teachers} />}
       {view === 'operations' && <BillingOperations />}
+      {view === 'alerts' && <AdminAlerts onChanged={reload} />}
       {view === 'audit' && (
         <div className="card">
           <h2>Histórico de alterações</h2>
