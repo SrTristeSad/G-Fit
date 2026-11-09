@@ -61,7 +61,11 @@ npm test
 - [x] Pix Asaas Sandbox: cobrança, QR dinâmico, Pix Copia e Cola, webhook autenticado e conciliação idempotente
 - [x] Renovação de vigência após pagamento verificado em sandbox, sem sobrescrever revogação administrativa
 - [x] Recuperação de cobranças inconclusivas por referência externa, sem gerar nova cobrança
-- [ ] Pix em produção: homologação, monitoramento, reembolsos, cancelamentos e reconciliação operacional
+- [x] Cancelamento de cobranças Pix não pagas em sandbox, confirmado no provedor
+- [x] Recepção de PAYMENT_DELETED com conciliação idempotente
+- [x] Consulta de estornos parciais/totais e eventos de reembolso, somando apenas devoluções DONE
+- [x] Indicadores administrativos de cobranças pendentes, vencidas, canceladas e estornos em sandbox
+- [ ] Pix em produção: homologação real, controles de estorno, monitoramento, reconciliação operacional e contabilidade
 - [x] Troca de senha no painel Minha conta, com revogação das sessões
 - [ ] Recuperação de senha, exclusão/exportação de dados, backups e auditoria mais ampla
 - [ ] Revisão de segurança, LGPD, testes de integração e implantação HTTPS
@@ -129,10 +133,22 @@ Para testar no painel: atribua um plano, abra a aba Vigências, conceda um inter
 
 O PostgreSQL registra os IDs dos eventos do Asaas como chave única, impedindo dupla liquidação e dupla extensão de acesso por reentrega. O histórico administrativo registra decisões financeiras verificadas, mas não contém credenciais.
 
-**Limitações que impedem uso comercial:** ainda faltam conciliação de reembolsos/estornos, cancelamento de cobrança, alertas de webhook parado, gestão segura de contas financeiras, políticas comerciais, verificação de conformidade e testes com a conta oficial em produção. As contas sem prazo configurado continuam com o comportamento legado para preservar compatibilidade com versões anteriores. Cobrança de teste não deve ser tratada como receita real.
+**Limitações que impedem uso comercial:** ainda faltam a solicitação e aprovação operacional de estornos, alertas de webhook parado, tratamento completo dos possíveis estados do provedor, gestão segura de contas financeiras, políticas comerciais, conciliação de divergências e testes com a conta oficial em produção. As contas sem prazo configurado continuam com o comportamento legado para preservar compatibilidade com versões anteriores. Cobrança de teste não deve ser tratada como receita real.
+
+### Cancelamentos, vencimentos e estornos (Sandbox)
+
+- **Cobrança pendente:** em **Administração → Financeiro (teste)**, use **Cancelar cobrança de teste**. O servidor consulta os dados no Asaas, envia a exclusão apenas se ela ainda não estiver paga, consulta novamente a confirmação e registra a ação no histórico. Somente o administrador tem acesso a essa operação.
+- **Cobrança vencida:** o indicador "vencida" significa que a data local de vencimento passou e o registro ainda está pendente. Isso **não** prova que o Asaas anulou a cobrança. Ela continua bloqueando a criação de outra cobrança até ser cancelada ou conciliada.
+- **Cobrança paga:** a operação de exclusão **não** é permitida, porque devolução de dinheiro exige fluxo de estorno separado.
+- **Estorno:** o botão **Consultar estornos** verifica o pagamento no Asaas e registra o total efetivamente devolvido. O servidor também processa os webhooks `PAYMENT_REFUNDED`, `PAYMENT_PARTIALLY_REFUNDED`, `PAYMENT_REFUND_IN_PROGRESS`, `PAYMENT_REFUND_DENIED` e `PAYMENT_DELETED`, sempre consultando os dados atuais no provedor. Estornos com status `PENDING` não são contabilizados como devolvidos; somente os com status `DONE` são somados.
+- **Acesso do professor:** estorno não reduz automaticamente sua vigência, pois pode envolver devolução parcial, mais de uma cobrança ou regras contratuais ainda não implementadas. O administrador precisa avaliar a situação. O histórico de recebimento é preservado mesmo quando o valor foi totalmente estornado.
+
+Os indicadores de receita e estorno apresentados no painel são **exclusivamente do sandbox**, sem equivalência com receita contábil real, e não constituem rotina automática de cancelamento ou reembolso. Para usar a conciliação por webhook, inclua os eventos correspondentes na configuração do Asaas Sandbox.
+
+Referências oficiais: [exclusão de cobrança](https://docs.asaas.com/reference/excluir-cobranca), [eventos de cobrança](https://docs.asaas.com/docs/webhook-para-cobrancas) e [regras de estorno](https://docs.asaas.com/docs/estornos).
 
 ### Testes automáticos do Pix
 
-O GitHub Actions utiliza `docker-compose.ci.yml` e `api/test/mock-asaas.mjs` para simular respostas e pagamentos do Asaas sem chaves reais. **Nunca execute a configuração de CI com dados reais.** O teste cobre autenticação, geração da cobrança e QR Code, webhook idempotente, vencimento, revogação, conferência de valor e recuperação de resposta perdida.
+O GitHub Actions utiliza `docker-compose.ci.yml` e `api/test/mock-asaas.mjs` para simular respostas e pagamentos do Asaas sem chaves reais. **Nunca execute a configuração de CI com dados reais.** O teste cobre autenticação, geração da cobrança e QR Code, webhook idempotente, vigências, conferência de valor, recuperação de resposta perdida, cancelamento de pendências e estornos parciais ou totais, sem movimentar dinheiro.
 
 Referências oficiais: https://docs.asaas.com/docs/cobrancas-via-pix ; https://docs.asaas.com/docs/como-implementar-idempotencia-em-webhooks ; https://docs.asaas.com/reference/listar-cobrancas
