@@ -57,6 +57,10 @@ export async function initDatabase() {
       'CREATE TABLE IF NOT EXISTS asaas_webhook_events (event_id VARCHAR(180) PRIMARY KEY, event_type VARCHAR(90) NOT NULL, provider_payment_id VARCHAR(100), resolution VARCHAR(24) NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
       'CREATE TABLE IF NOT EXISTS asaas_webhook_attempts (event_id VARCHAR(180) PRIMARY KEY, event_type VARCHAR(90) NOT NULL, provider_payment_id VARCHAR(100), attempts INTEGER NOT NULL DEFAULT 1 CHECK(attempts > 0), failure_count INTEGER NOT NULL DEFAULT 0, first_received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_http_status SMALLINT, last_error_code VARCHAR(48));',
       'CREATE INDEX IF NOT EXISTS webhook_attempts_last_seen_idx ON asaas_webhook_attempts(last_received_at DESC);',
+      'CREATE TABLE IF NOT EXISTS admin_alerts (id UUID PRIMARY KEY, alert_type VARCHAR(40) NOT NULL, source_key VARCHAR(180) NOT NULL, severity VARCHAR(10) NOT NULL CHECK (severity IN (\'warning\',\'critical\')), status VARCHAR(16) NOT NULL DEFAULT \'open\' CHECK (status IN (\'open\',\'acknowledged\',\'resolved\')), details JSONB NOT NULL DEFAULT \'{}\'::jsonb, first_detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), acknowledged_at TIMESTAMPTZ, acknowledged_by UUID REFERENCES teachers(id), resolved_at TIMESTAMPTZ, UNIQUE(alert_type,source_key));',
+      'CREATE INDEX IF NOT EXISTS admin_alerts_status_idx ON admin_alerts(status,last_detected_at DESC);',
+      'CREATE TABLE IF NOT EXISTS admin_alert_scanner (id SMALLINT PRIMARY KEY CHECK(id=1), last_success_at TIMESTAMPTZ, last_error_at TIMESTAMPTZ);',
+      'INSERT INTO admin_alert_scanner (id) VALUES (1) ON CONFLICT(id) DO NOTHING;',
     ].join('\n'));
     await client.query('COMMIT');
   } catch (error) {
