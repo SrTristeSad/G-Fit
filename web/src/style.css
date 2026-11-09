@@ -350,3 +350,17 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
   .assessment-values { grid-template-columns:1fr; }
   .assessment-entry .actions button { flex:1 1 180px; }
 }
+
+
+/* Privacidade do aluno: inventário e histórico de exportações locais */
+.student-privacy { border-top:3px solid #3e7854; }
+.privacy-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:11px; }
+.privacy-count { padding:13px;border:1px solid #dce7df;background:#f7faf8;border-radius:11px;
+  display:grid;gap:5px;align-content:start; }
+.privacy-count strong { font-size:24px;color:#195637;font-variant-numeric:tabular-nums; }
+.privacy-count span { font-size:12px;color:#52705b; }
+.privacy-export-history { list-style:none;padding:0;display:grid;gap:7px;margin:12px 0; }
+.privacy-export-history li { display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;
+  border-bottom:1px solid #e4ebe5;padding:8px 0; }
+.privacy-export-history small { color:#617468; }
+@media(max-width:700px){.student-privacy .actions button{width:100%;}}
