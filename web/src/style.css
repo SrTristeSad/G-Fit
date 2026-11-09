@@ -129,3 +129,28 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
 }
 
 .auth-card-wide { max-width: 630px; }
+
+
+/* Administração */
+.admin-tabs { display:flex; gap:8px; border-bottom:1px solid #d7e4db; overflow-x:auto; }
+.admin-tabs button { border:0; border-bottom:3px solid transparent; padding:14px 18px; background:transparent; font-weight:700; color:#62796d; white-space:nowrap; }
+.admin-tabs button.active { color:#135f42; border-color:#135f42; }
+.admin-stats { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:16px; }
+.admin-stat { padding:20px; background:white; border:1px solid #e2e8e1; border-radius:16px; display:grid; gap:6px; }
+.admin-stat > span { color:#586e61; font-size:14px; font-weight:650; }
+.admin-stat > strong { color:#135f42; font-size:32px; font-variant-numeric:tabular-nums; }
+.admin-stat > small { color:#64776c; }
+.admin-filters { display:flex; flex-wrap:wrap; align-items:end; gap:14px; margin-top:22px; }
+.admin-filters label:first-child { min-width:200px; flex:1; }
+.admin-filters label { min-width:145px; }
+.admin-filters select { padding:13px; border:1px solid #bfc9c0; border-radius:10px; background:white; font:inherit; min-height:48px; }
+.admin-history { padding:0; margin:20px 0 0; list-style:none; }
+.admin-history li { display:grid; gap:5px; padding:14px 0; border-bottom:1px solid #e6ece7; }
+.admin-history li span { color:#385b48; }
+.admin-history li small { color:#687a6e; }
+.saved-message { color:#14613d; font-size:14px; font-weight:700; margin:0; }
+@media(max-width:700px) {
+  .admin-stats { grid-template-columns: repeat(2,minmax(0,1fr)); gap:10px; }
+  .admin-stat { padding:13px; }
+  .admin-stat > strong { font-size:27px; }
+}
