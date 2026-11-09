@@ -21,10 +21,16 @@ jobs:
       - name: Validate Docker Compose
         env:
           POSTGRES_PASSWORD: test_only_not_for_production
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: docker compose config --quiet
+      - name: Validate standard Docker Compose without mock
+        env:
+          POSTGRES_PASSWORD: test_only_not_for_production
+        run: docker compose -f docker-compose.yml config --quiet
       - name: Smoke test with PostgreSQL and HTTP
         env:
           POSTGRES_PASSWORD: test_only_not_for_production
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: |
           set -euo pipefail
           docker compose up -d --build
@@ -51,6 +57,7 @@ jobs:
       - name: Administrator provisioning and role/limit integration tests
         env:
           POSTGRES_PASSWORD: test_only_not_for_production
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: |
           set -euo pipefail
           docker compose exec -T api node src/bootstrap-admin.js admin@example.com > /tmp/gfit-admin.txt
@@ -58,6 +65,7 @@ jobs:
           ADMIN_PASSWORD="$(sed -n 's/^Password: //p' /tmp/gfit-admin.txt)"
           test -n "$ADMIN_PASSWORD"
           node api/test/e2e.mjs
+          node api/test/pix-e2e.mjs
           if docker compose exec -T api node src/bootstrap-admin.js outro@example.com > /dev/null 2>&1; then
             echo "ERROR: second admin bootstrap should be blocked"
             exit 1
@@ -66,4 +74,5 @@ jobs:
         if: always()
         env:
           POSTGRES_PASSWORD: test_only_not_for_production
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: docker compose down
