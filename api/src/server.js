@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { randomUUID } from 'node:crypto';
 import { db, initDatabase } from './db.js';
+import { registerAdminReadRoutes } from './admin.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -174,18 +175,54 @@ app.patch('/api/admin/teachers/:id', requireTeacher, requireAdmin, async (req, r
       (isActive !== undefined && typeof isActive !== 'boolean')) {
     return res.status(400).json({ error: 'Informe limite de 0 a 10.000 ou situação válida.' });
   }
-  if (id === req.teacher.id && isActive === false) {
-    return res.status(400).json({ error: 'Não é permitido desativar a própria conta administrativa.' });
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const previous = await client.query(
+      'SELECT id, is_admin, is_active, max_students FROM teachers WHERE id = $1 FOR UPDATE',
+      [id],
+    );
+    if (!previous.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Professor não encontrado.' });
+    }
+    const before = previous.rows[0];
+    // Nenhuma conta administrativa pode ser desativada por este fluxo.
+    if (before.is_admin && isActive === false) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Não é permitido desativar uma conta administrativa.' });
+    }
+    const nextMax = maxStudents ?? before.max_students;
+    const nextActive = isActive ?? before.is_active;
+    const changed = nextMax !== before.max_students || nextActive !== before.is_active;
+    const updated = await client.query(
+      'UPDATE teachers SET max_students=$2, is_active=$3 WHERE id=$1 ' +
+      'RETURNING id, full_name AS name, email, is_active AS "isActive", max_students AS "maxStudents"',
+      [id, nextMax, nextActive],
+    );
+    if (changed) {
+      // Mesma transação: não se confirma alteração sem registrar seu autor.
+      await client.query(
+        'INSERT INTO admin_audit_logs (id, actor_id, target_teacher_id, action, changes) ' +
+        'VALUES ($1, $2, $3, $4, $5::jsonb)',
+        [randomUUID(), req.teacher.id, id, 'teacher.settings.updated', JSON.stringify({
+          before: { maxStudents: before.max_students, isActive: before.is_active },
+          after: { maxStudents: nextMax, isActive: nextActive },
+        })],
+      );
+    }
+    await client.query('COMMIT');
+    res.json({ teacher: updated.rows[0] });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-  const result = await db.query(
-    'UPDATE teachers SET max_students = COALESCE($2, max_students), ' +
-    'is_active = COALESCE($3, is_active) WHERE id = $1 ' +
-    'RETURNING id, full_name AS name, email, is_active AS "isActive", max_students AS "maxStudents"',
-    [id, maxStudents ?? null, isActive ?? null],
-  );
-  if (!result.rows.length) return res.status(404).json({ error: 'Professor não encontrado.' });
-  res.json({ teacher: result.rows[0] });
 });
+
+registerAdminReadRoutes(app, requireTeacher, requireAdmin);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
