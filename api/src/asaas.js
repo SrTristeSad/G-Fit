@@ -27,16 +27,57 @@ export function validBillDate(value) {
   return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
 }
 
-export function matchesPaidCharge(remote, charge) {
+export function matchesChargeIdentity(remote, charge) {
   return !!remote && !!charge && remote.billingType === 'PIX' &&
-    ['RECEIVED', 'CONFIRMED'].includes(remote.status) &&
     remote.externalReference === charge.id &&
     remote.customer === charge.asaas_customer_id &&
-    Number.isFinite(Number(remote.value)) &&
-    Math.round(Number(remote.value) * 100) === charge.amount_cents &&
+    typeof remote.value === 'number' && Number.isFinite(remote.value) &&
+    Math.abs(remote.value * 100 - Math.round(remote.value * 100)) < 0.00001 &&
+    Math.round(remote.value * 100) === charge.amount_cents &&
     validPaymentId(remote.id) &&
     (!charge.provider_payment_id || remote.id === charge.provider_payment_id);
 }
+
+export function matchesPaidCharge(remote, charge) {
+  return matchesChargeIdentity(remote, charge) &&
+    ['RECEIVED', 'CONFIRMED'].includes(remote.status) &&
+    remote.deleted !== true;
+}
+
+export function isDeletedPayment(remote) {
+  return remote?.deleted === true || remote?.status === 'DELETED';
+}
+
+// A presenca de um pedido de estorno nao significa que o dinheiro foi devolvido.
+// Somente estornos DONE somam ao total efetivamente devolvido.
+export function summarizeRefunds(remote, amountCents) {
+  if (!Number.isInteger(amountCents) || amountCents <= 0 ||
+      !remote || typeof remote !== 'object') return { state: 'review', refundedCents: 0 };
+  const list = remote.refunds;
+  if (!Array.isArray(list)) {
+    return {
+      state: ['REFUNDED', 'REFUND_REQUESTED', 'REFUND_IN_PROGRESS'].includes(remote.status) ? 'review' : 'none',
+      refundedCents: 0,
+    };
+  }
+  let refundedCents = 0;
+  let pending = false;
+  for (const item of list) {
+    if (!item || typeof item.status !== 'string' || typeof item.value !== 'number' ||
+        !Number.isFinite(item.value) || item.value <= 0 ||
+        Math.abs(item.value * 100 - Math.round(item.value * 100)) > 0.00001) {
+      return { state: 'review', refundedCents: 0 };
+    }
+    if (item.status === 'DONE') refundedCents += Math.round(item.value * 100);
+    else if (item.status === 'PENDING') pending = true;
+    else if (item.status !== 'CANCELLED') return { state: 'review', refundedCents: 0 };
+  }
+  if (refundedCents > amountCents) return { state: 'review', refundedCents: 0 };
+  if (refundedCents === amountCents) return { state: 'full', refundedCents };
+  if (refundedCents > 0) return { state: 'partial', refundedCents };
+  return { state: pending ? 'pending' : 'none', refundedCents: 0 };
+}
+
 export function centsToValue(cents) {
   if (!Number.isInteger(cents) || cents <= 0 || cents > 10000000) throw new Error('INVALID_AMOUNT');
   return Number((cents / 100).toFixed(2));
@@ -92,4 +133,9 @@ export function findAsaasPaymentsByReference(referenceId) {
 export function getAsaasPixQr(id) {
   if (!validPaymentId(id)) throw new Error('INVALID_PAYMENT_ID');
   return asaasRequest('/payments/' + encodeURIComponent(id) + '/pixQrCode');
+}
+
+export function deleteAsaasPayment(id) {
+  if (!validPaymentId(id)) throw new Error('INVALID_PAYMENT_ID');
+  return asaasRequest('/payments/' + encodeURIComponent(id), { method: 'DELETE' });
 }
