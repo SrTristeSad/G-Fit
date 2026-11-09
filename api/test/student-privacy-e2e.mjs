@@ -189,4 +189,18 @@ assert.equal(archived.data.student.active,false);
 assert.equal(archived.data.functionalAssessments.length,1);
 assert.equal((await request(privacy,{cookie:t1})).data.recentExports.length,2);
 assert.equal((await request(privacy,{cookie:t2})).status,404);
+
+const adminPassword=process.env.ADMIN_PASSWORD;
+assert.ok(adminPassword);
+const admin=await login('admin@example.com',adminPassword);
+assert.equal((await request(privacy,{cookie:admin})).status,404);
+assert.equal((await request(exportPath,{
+  method:'POST',cookie:admin,body:{confirmation:'EXPORT_SENSITIVE_DATA'},
+})).status,404);
+const dashboard=await request('/api/admin/dashboard',{cookie:admin});
+assert.equal(dashboard.status,200);
+assert.ok(dashboard.data.overview.studentExportsTotal>=2);
+assert.ok(dashboard.data.overview.studentExportsLast30d>=2);
+assert.equal(JSON.stringify(dashboard.data).includes('Observacoes pessoais ficticias'),false);
+
 console.log('Privacidade: exportação completa, no-store, auditoria e isolamento de alunos aprovados.');
