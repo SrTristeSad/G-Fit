@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
 import PlansPanel from './PlansPanel.jsx';
 import AccessPanel from './AccessPanel.jsx';
+import BillingPanel from './BillingPanel.jsx';
 
 function Stat({ label, value, caption }) {
   return (
@@ -250,6 +251,9 @@ export default function AdminPanel() {
         <button className={view === 'access' ? 'active' : ''} onClick={() => setView('access')}>
           Vigências
         </button>
+        <button className={view === 'billing' ? 'active' : ''} onClick={() => setView('billing')}>
+          Financeiro (teste)
+        </button>
         <button className={view === 'audit' ? 'active' : ''} onClick={() => setView('audit')}>
           Histórico
         </button>
@@ -287,8 +291,8 @@ export default function AdminPanel() {
               <h2>Financeiro e assinaturas</h2>
               <p className="muted">{billing?.message || 'Sem dados financeiros disponíveis.'}</p>
               <p className="notice">
-                O G Fit permite configurar planos e atribuí-los manualmente, mas ainda não gera cobranças, assinaturas pagas ou relatórios de receita.
-                Esta área será ligada ao provedor Pix posteriormente.
+                O G Fit possui geração e conciliação de Pix apenas em sandbox. Não há faturamento real nem homologação para produção.
+                Entre em Financeiro (teste) para acessar as cobranças simuladas.
               </p>
             </div>
           </div>
@@ -323,6 +327,7 @@ export default function AdminPanel() {
       )}
       {view === 'plans' && <PlansPanel plans={plans} onChanged={reload} />}
       {view === 'access' && <AccessPanel teachers={teachers} accessTerms={accessTerms} refresh={reload} />}
+      {view === 'billing' && <BillingPanel admin teachers={teachers} />}
       {view === 'audit' && (
         <div className="card">
           <h2>Histórico de alterações</h2>
