@@ -46,6 +46,11 @@ export async function initDatabase() {
       'CREATE INDEX IF NOT EXISTS teacher_plan_assignments_plan_idx ON teacher_plan_assignments(plan_id);',
       'CREATE TABLE IF NOT EXISTS teacher_access_terms (teacher_id UUID PRIMARY KEY REFERENCES teachers(id) ON DELETE CASCADE, starts_on DATE NOT NULL, ends_on DATE NOT NULL, revoked_at TIMESTAMPTZ, updated_by UUID NOT NULL REFERENCES teachers(id), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), CHECK (ends_on >= starts_on));',
       'CREATE INDEX IF NOT EXISTS teacher_access_terms_ends_idx ON teacher_access_terms(ends_on) WHERE revoked_at IS NULL;',
+      'CREATE TABLE IF NOT EXISTS asaas_customers (teacher_id UUID PRIMARY KEY REFERENCES teachers(id) ON DELETE CASCADE, customer_id VARCHAR(100) NOT NULL, updated_by UUID NOT NULL REFERENCES teachers(id), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
+      'CREATE TABLE IF NOT EXISTS pix_charges (id UUID PRIMARY KEY, teacher_id UUID NOT NULL REFERENCES teachers(id) ON DELETE CASCADE, plan_id UUID NOT NULL REFERENCES plans(id), created_by UUID NOT NULL REFERENCES teachers(id), asaas_customer_id VARCHAR(100) NOT NULL, provider_payment_id VARCHAR(100) UNIQUE, amount_cents INTEGER NOT NULL CHECK(amount_cents>0), billing_cycle VARCHAR(10) NOT NULL CHECK(billing_cycle IN (\'monthly\',\'yearly\')), due_date DATE NOT NULL, status VARCHAR(20) NOT NULL DEFAULT \'creating\' CHECK(status IN (\'creating\',\'pending\',\'paid\',\'cancelled\',\'review\')), paid_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
+      'CREATE UNIQUE INDEX IF NOT EXISTS pix_one_open_per_teacher ON pix_charges(teacher_id) WHERE status IN (\'creating\',\'pending\');',
+      'CREATE INDEX IF NOT EXISTS pix_charges_teacher_idx ON pix_charges(teacher_id,created_at DESC);',
+      'CREATE TABLE IF NOT EXISTS asaas_webhook_events (event_id VARCHAR(180) PRIMARY KEY, event_type VARCHAR(90) NOT NULL, provider_payment_id VARCHAR(100), resolution VARCHAR(24) NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
     ].join('\n'));
     await client.query('COMMIT');
   } catch (error) {
