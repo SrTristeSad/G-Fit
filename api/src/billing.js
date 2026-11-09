@@ -203,7 +203,7 @@ export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLim
     finally { client.release(); }
   });
 
-  app.post('/api/admin/teachers/:id/pix-charge', requireTeacher, requireAdmin, limited, async (req, res) => {
+  const issuePixCharge = async (req, res) => {
     if (!asaasConfigured()) return providerUnavailable(res);
     const { id } = req.params;
     const { dueDate } = req.body ?? {};
@@ -279,6 +279,15 @@ export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLim
         chargeId, status: 'creating', sandbox: true,
       });
     }
+  };
+  app.post('/api/admin/teachers/:id/pix-charge', requireTeacher, requireAdmin, limited, issuePixCharge);
+  app.post('/api/account/pix-charge', requireTeacher, limited, (req, res) => {
+    if (req.teacher.is_admin) {
+      return res.status(403).json({ error: 'Administradores não podem solicitar cobrança de professor.' });
+    }
+    req.params.id = req.teacher.id;
+    req.body = { dueDate: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10) };
+    return issuePixCharge(req, res);
   });
 
   app.get('/api/billing/charges/:id/pix', requireTeacher, limited, async (req, res) => {
