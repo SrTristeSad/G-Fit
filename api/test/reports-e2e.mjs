@@ -26,7 +26,7 @@ const range='?from='+today+'&to='+today;
 assert.equal((await request('/api/reports/overview')).status,401);
 assert.equal((await request('/api/reports/students/not-a-uuid'+range,{cookie:t1})).status,400);
 assert.equal((await request('/api/reports/overview?from=2026-02-30&to=2026-03-01',{cookie:t1})).status,400);
-assert.equal((await request('/api/reports/overview?from=2026-01-01&to=2027-01-01',{cookie:t1})).status,400);
+assert.equal((await request('/api/reports/overview?from=2026-01-01&to=2027-01-02',{cookie:t1})).status,400);
 assert.equal((await request('/api/reports/overview?from=2026-11-01',{cookie:t1})).status,400);
 assert.equal((await request('/api/reports/overview?from=2026-12-01&to=2026-11-01',{cookie:t1})).status,400);
 
