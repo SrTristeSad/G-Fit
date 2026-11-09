@@ -17,16 +17,19 @@ function App() {
   const [students, setStudents] = useState([]);
   const [quota, setQuota] = useState({ activeStudents: 0, maxStudents: 20 });
   const [myPlan, setMyPlan] = useState(null);
+  const [myAccess, setMyAccess] = useState(null);
   const [studentName, setStudentName] = useState('');
 
   const refreshStudents = useCallback(async () => {
-    const [result, planInfo] = await Promise.all([
+    const [result, planInfo, accessInfo] = await Promise.all([
       api('/api/students'),
       api('/api/account/plan'),
+      api('/api/account/access'),
     ]);
     setStudents(result.students);
     setQuota(result.quota);
     setMyPlan(planInfo.plan);
+    setMyAccess(accessInfo.access);
   }, []);
 
   useEffect(() => {
@@ -83,6 +86,7 @@ function App() {
       setTeacher(null);
       setStudents([]);
       setMyPlan(null);
+      setMyAccess(null);
       setSelectedId(null);
       setTab('students');
     } catch (err) { setError(err.message); }
@@ -163,6 +167,14 @@ function App() {
                         {myPlan ? 'Plano vinculado: ' + myPlan.name + ' (atribuição manual; sem cobrança Pix)' :
                           'Sem plano comercial atribuído; vale o limite individual configurado pela administração.'}
                       </p>
+                      {myAccess && myAccess.status !== 'legacy' && (
+                        <p className={myAccess.status === 'active' ? 'muted' : 'error'} role="status">
+                          Prazo administrativo: {myAccess.startsOn} até {myAccess.endsOn}.
+                          {myAccess.status === 'active' ? ' Acesso dentro da vigência.' :
+                            ' A vigência não está ativa: novos alunos e novas prescrições estão bloqueados.'}
+                          {' '}Isso não confirma pagamento.
+                        </p>
+                      )}
                     </div>
                     <div className="stat">
                       <strong>{quota.activeStudents} / {quota.maxStudents}</strong>
