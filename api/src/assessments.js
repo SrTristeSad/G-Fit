@@ -18,8 +18,8 @@ const fields = [
 function previousSnapshot(record) {
   return {
     date: record.date, category: record.category, testName: record.testName,
-    protocol: record.protocol, value: record.value, unit: record.unit,
-    notes: record.notes,
+    protocol: record.protocol, notes: record.notes,
+    value: record.value, unit: record.unit,
   };
 }
 async function findStudent(id, teacherId, activeOnly = false) {
@@ -92,9 +92,10 @@ export function registerAssessmentRoutes(app, requireTeacher, requireAccessForNe
         await client.query('BEGIN');
         const current=await client.query(
           'SELECT '+fields+' FROM functional_assessments a ' +
-          'JOIN students s ON s.id=a.student_id AND s.teacher_id=a.teacher_id ' +
           'WHERE a.id=$1 AND a.student_id=$2 AND a.teacher_id=$3 ' +
-          'AND NOT a.is_void AND s.is_active FOR UPDATE OF a',
+          'AND NOT a.is_void AND EXISTS (SELECT 1 FROM students s ' +
+          'WHERE s.id=a.student_id AND s.teacher_id=a.teacher_id AND s.is_active) ' +
+          'FOR UPDATE OF a',
           [req.params.assessmentId,req.params.id,req.teacher.id],
         );
         if (!current.rows.length) {
