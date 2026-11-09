@@ -7,7 +7,7 @@ const blank = {
 };
 function normalized(student) {
   return Object.fromEntries(
-    Object.keys(blank).map(key => [key, student[key] ?? '']),
+    Object.keys(blank).map(key => [key, key === 'dateOfBirth' && student[key] ? String(student[key]).slice(0, 10) : (student[key] ?? '')]),
   );
 }
 function age(date) {
