@@ -267,6 +267,9 @@ export default function AdminPanel() {
             <Stat label="Atividades atribuídas" value={overview?.exercisesAssigned ?? '—'} />
             <Stat label="Realizações registradas" value={overview?.completionsLogged ?? '—'} />
             <Stat label="Novos professores (30 dias)" value={overview?.teachersNew30d ?? '—'} />
+            <Stat label="Prazos ativos (manual)" value={overview?.manualAccessActive ?? '—'} />
+            <Stat label="Prazos vencidos (manual)" value={overview?.manualAccessExpired ?? '—'} />
+            <Stat label="Prazos agendados (manual)" value={overview?.manualAccessScheduled ?? '—'} />
           </div>
           <div className="columns">
             <div className="card">
