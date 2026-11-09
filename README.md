@@ -116,16 +116,16 @@ Para testar no painel: atribua um plano, abra a aba Vigências, conceda um inter
 
 ## Pix via Asaas Sandbox — testes apenas
 
-**O G Fit não está pronto para processar dinheiro real.** O backend usa exclusivamente \`https://api-sandbox.asaas.com/v3\`. A chave e o token nunca devem ser colocados no código-fonte, no frontend ou em commits.
+**O G Fit não está pronto para processar dinheiro real.** O backend usa exclusivamente `https://api-sandbox.asaas.com/v3`. A chave e o token nunca devem ser colocados no código-fonte, no frontend ou em commits.
 
-1. Crie uma conta **Asaas Sandbox** e configure uma chave Pix no ambiente de testes. Copie a API Key do sandbox (prefixo \`$aact_hmlg_\`).
-2. No arquivo local \`.env\` (não versionado), defina \`ASAAS_API_KEY\` e \`ASAAS_WEBHOOK_TOKEN\`. O segundo valor deve ser um segredo aleatório de 32 a 255 caracteres, diferente da API Key, que será usado como \`authToken\` no webhook.
-3. Reinicie a API: \`docker compose up -d --build\`.
-4. No Asaas Sandbox, crie o webhook apontando para **\`https://SEU-DOMINIO/api/webhooks/asaas\`** (domínio público com HTTPS) e configure o mesmo \`authToken\`. Selecione os eventos \`PAYMENT_RECEIVED\` e \`PAYMENT_CONFIRMED\`. Não exponha o ambiente local publicamente sem HTTPS e revisão de segurança.
-5. No Asaas Sandbox, cadastre um cliente (pagador) de teste e copie seu ID (\`cus_...\`). No G Fit, vincule esse ID ao professor em **Administração → Financeiro (teste)**. O professor também precisa ter um plano com preço maior que zero atribuído.
+1. Crie uma conta **Asaas Sandbox** e configure uma chave Pix no ambiente de testes. Copie a API Key do sandbox (prefixo `$aact_hmlg_`).
+2. No arquivo local `.env` (não versionado), defina `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN`. O segundo valor deve ser um segredo aleatório de 32 a 255 caracteres, diferente da API Key, que será usado como `authToken` no webhook.
+3. Reinicie a API: `docker compose up -d --build`.
+4. No Asaas Sandbox, crie o webhook apontando para **`https://SEU-DOMINIO/api/webhooks/asaas`** (domínio público com HTTPS) e configure o mesmo `authToken`. Selecione os eventos `PAYMENT_RECEIVED` e `PAYMENT_CONFIRMED`. Não exponha o ambiente local publicamente sem HTTPS e revisão de segurança.
+5. No Asaas Sandbox, cadastre um cliente (pagador) de teste e copie seu ID (`cus_...`). No G Fit, vincule esse ID ao professor em **Administração → Financeiro (teste)**. O professor também precisa ter um plano com preço maior que zero atribuído.
 6. O professor pode acessar **Pix (teste)** e gerar sua cobrança; ou o administrador pode criá-la para ele. Ambos podem visualizar as cobranças permitidas; o professor vê somente as próprias.
 7. A confirmação de pagamento é recebida via webhook. O G Fit consulta a API do Asaas para verificar ID, valor, tipo PIX, cliente, referência externa e status. Se os dados coincidirem, a cobrança é marcada como recebida **no sandbox** e a vigência é estendida **somente se o plano continuar atribuído e o prazo não estiver revogado**.
-8. Em **Administração → Financeiro (teste)**, a opção **Conferir no Asaas** consulta cobranças conhecidas, e **Recuperar no Asaas** procura cobranças com resposta de criação inconclusiva pelo identificador \`externalReference\`, sem emitir duplicatas.
+8. Em **Administração → Financeiro (teste)**, a opção **Conferir no Asaas** consulta cobranças conhecidas, e **Recuperar no Asaas** procura cobranças com resposta de criação inconclusiva pelo identificador `externalReference`, sem emitir duplicatas.
 
 O PostgreSQL registra os IDs dos eventos do Asaas como chave única, impedindo dupla liquidação e dupla extensão de acesso por reentrega. O histórico administrativo registra decisões financeiras verificadas, mas não contém credenciais.
 
@@ -133,6 +133,6 @@ O PostgreSQL registra os IDs dos eventos do Asaas como chave única, impedindo d
 
 ### Testes automáticos do Pix
 
-O GitHub Actions utiliza \`docker-compose.ci.yml\` e \`api/test/mock-asaas.mjs\` para simular respostas e pagamentos do Asaas sem chaves reais. **Nunca execute a configuração de CI com dados reais.** O teste cobre autenticação, geração da cobrança e QR Code, webhook idempotente, vencimento, revogação, conferência de valor e recuperação de resposta perdida.
+O GitHub Actions utiliza `docker-compose.ci.yml` e `api/test/mock-asaas.mjs` para simular respostas e pagamentos do Asaas sem chaves reais. **Nunca execute a configuração de CI com dados reais.** O teste cobre autenticação, geração da cobrança e QR Code, webhook idempotente, vencimento, revogação, conferência de valor e recuperação de resposta perdida.
 
 Referências oficiais: https://docs.asaas.com/docs/cobrancas-via-pix ; https://docs.asaas.com/docs/como-implementar-idempotencia-em-webhooks ; https://docs.asaas.com/reference/listar-cobrancas
