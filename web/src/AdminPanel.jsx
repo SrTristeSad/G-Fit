@@ -161,6 +161,17 @@ function AuditList({ events }) {
         } else if (event.action === 'teacher.access.revoked') {
           parts.push('Prazo de acesso revogado');
         }
+        else if (event.action === 'billing.pix.verified') {
+          parts.push('Pix Sandbox confirmado com o Asaas');
+          parts.push('Valor: R$ ' + ((event.changes?.amountCents || 0) / 100).toFixed(2).replace('.', ','));
+        } else if (event.action === 'billing.pix.cancelled') {
+          parts.push('Cobrança não paga removida no Asaas Sandbox');
+        } else if (event.action === 'billing.pix.refund.observed') {
+          parts.push('Estorno observado no Asaas Sandbox: ' + (event.changes?.refundState || 'revisão'));
+          parts.push('Devolvido: R$ ' + ((event.changes?.refundedCents || 0) / 100).toFixed(2).replace('.', ','));
+        } else if (event.action === 'billing.customer.configured') {
+          parts.push('Cliente Asaas Sandbox associado à conta');
+        }
         return (
           <li key={event.id}>
             <strong>{subject}</strong>
