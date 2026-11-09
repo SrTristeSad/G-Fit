@@ -168,6 +168,75 @@ const plansWithAssignment = await request('/api/admin/plans', { cookie: ca });
 assert.equal(plansWithAssignment.data.plans[0].assignedTeachers, 1);
 const accountList = await request('/api/admin/teachers', { cookie: ca });
 assert.equal(accountList.data.teachers.find(t => t.id === teacher1.id).planName, 'Profissional 30');
+// Vigencias manuais: nao criam faturas, nao confirmam pagamentos e nao apagam fichas.
+assert.equal((await request('/api/admin/access', { cookie: c1 })).status, 403);
+const legacyAccess = await request('/api/account/access', { cookie: c1 });
+assert.equal(legacyAccess.status, 200);
+assert.equal(legacyAccess.data.access.status, 'legacy');
+assert.equal(legacyAccess.data.billingConnected, false);
+assert.equal((await request('/api/admin/teachers/' + teacher2.id + '/access', {
+  method: 'PUT', cookie: ca, body: { startsOn: '2024-01-01', endsOn: '2024-01-31' },
+})).status, 409);
+assert.equal((await request('/api/admin/teachers/' + teacher1.id + '/access', {
+  method: 'PUT', cookie: c1, body: { startsOn: '2024-01-01', endsOn: '2024-01-31' },
+})).status, 403);
+assert.equal((await request('/api/admin/teachers/' + teacher1.id + '/access', {
+  method: 'PUT', cookie: ca, body: { startsOn: '2024-02-30', endsOn: '2024-03-20' },
+})).status, 400);
+const grantExpired = await request('/api/admin/teachers/' + teacher1.id + '/access', {
+  method: 'PUT', cookie: ca, body: { startsOn: '2024-01-01', endsOn: '2024-01-31' },
+});
+assert.equal(grantExpired.status, 200, JSON.stringify(grantExpired.data));
+assert.equal(grantExpired.data.access.status, 'expired');
+assert.equal((await request('/api/students/' + studentId, { cookie: c1 })).status, 200);
+assert.equal((await request('/api/students', {
+  method: 'POST', cookie: c1, body: { name: 'Cadastro impedido' },
+})).status, 403);
+assert.equal((await request('/api/students/' + studentId + '/exercises', {
+  method: 'POST', cookie: c1, body: { title: 'Atividade impedida', sets: 1, repetitions: 1 },
+})).status, 403);
+assert.equal((await request('/api/students/' + studentId + '/status', {
+  method: 'PATCH', cookie: c1, body: { active: true },
+})).status, 403);
+const todayUTC = new Date().toISOString().slice(0, 10);
+const tomorrow = new Date(Date.parse(todayUTC + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
+const in40days = new Date(Date.parse(todayUTC + 'T00:00:00Z') + 40 * 86400000).toISOString().slice(0, 10);
+const scheduledAccess = await request('/api/admin/teachers/' + teacher1.id + '/access', {
+  method: 'PUT', cookie: ca, body: { startsOn: tomorrow, endsOn: in40days },
+});
+assert.equal(scheduledAccess.status, 200);
+assert.equal(scheduledAccess.data.access.status, 'scheduled');
+const grantActive = await request('/api/admin/teachers/' + teacher1.id + '/access', {
+  method: 'PUT', cookie: ca, body: { startsOn: todayUTC, endsOn: in40days },
+});
+assert.equal(grantActive.status, 200);
+assert.equal(grantActive.data.access.status, 'active');
+const newAccessStudent = await request('/api/students', {
+  method: 'POST', cookie: c1, body: { name: 'Aluno durante vigência' },
+});
+assert.equal(newAccessStudent.status, 201, JSON.stringify(newAccessStudent.data));
+const renewAccess = await request('/api/admin/teachers/' + teacher1.id + '/access/renew', {
+  method: 'POST', cookie: ca, body: { months: 1 },
+});
+assert.equal(renewAccess.status, 200, JSON.stringify(renewAccess.data));
+assert.ok(renewAccess.data.access.endsOn > in40days);
+assert.equal(renewAccess.data.access.status, 'active');
+const accessList = await request('/api/admin/access', { cookie: ca });
+assert.equal(accessList.status, 200);
+assert.equal(accessList.data.accessTerms.find(t => t.teacherId === teacher1.id).status, 'active');
+const revokedAccess = await request('/api/admin/teachers/' + teacher1.id + '/access/revoke', {
+  method: 'POST', cookie: ca,
+});
+assert.equal(revokedAccess.status, 200);
+assert.equal(revokedAccess.data.access.status, 'revoked');
+assert.equal((await request('/api/students', {
+  method: 'POST', cookie: c1, body: { name: 'Bloqueio depois da revogação' },
+})).status, 403);
+assert.equal((await request('/api/admin/teachers/' + teacher1.id + '/access/renew', {
+  method: 'POST', cookie: ca, body: { months: 1 },
+})).status, 409);
+assert.equal((await request('/api/account/access', { cookie: c1 })).data.access.status, 'revoked');
+
 const disablePlan = await request('/api/admin/plans/' + planId, {
   method: 'PATCH', cookie: ca, body: { isActive: false },
 });
