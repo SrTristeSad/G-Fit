@@ -48,6 +48,7 @@ npm test
 - [x] Planejamento semanal por aluno (segunda a domingo), duração opcional e edição de prescrições
 - [x] Turmas privadas com dias da semana, horário, duração e limite independente de vagas
 - [x] Matrículas por professor com proteção contra exceder capacidade e arquivamento sem perda de histórico
+- [x] Indicadores administrativos agregados de turmas, aulas e presenças, sem exposição de alunos individuais
 - [x] Aulas cadastradas por data e presença manual (presente, ausente, justificado), com correção de registros
 - [x] Compatibilidade com exercícios antigos em texto livre, sem apagar os registros de realização
 - [x] Administração: ver professores, ativar/desativar contas e definir máximo de alunos ativos
