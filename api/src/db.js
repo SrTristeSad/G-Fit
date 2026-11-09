@@ -40,6 +40,10 @@ export async function initDatabase() {
       'CREATE INDEX IF NOT EXISTS completions_student_idx ON exercise_completions(student_id, teacher_id);',
       'CREATE TABLE IF NOT EXISTS admin_audit_logs (id UUID PRIMARY KEY, actor_id UUID NOT NULL REFERENCES teachers(id), target_teacher_id UUID REFERENCES teachers(id), action VARCHAR(60) NOT NULL, changes JSONB NOT NULL DEFAULT \'{}\'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
       'CREATE INDEX IF NOT EXISTS admin_audit_recent_idx ON admin_audit_logs(created_at DESC);',
+      'CREATE TABLE IF NOT EXISTS plans (id UUID PRIMARY KEY, name VARCHAR(80) NOT NULL, description VARCHAR(300) NOT NULL DEFAULT \'\', price_cents INTEGER NOT NULL CHECK (price_cents >= 0 AND price_cents <= 10000000), billing_cycle VARCHAR(10) NOT NULL CHECK (billing_cycle IN (\'monthly\', \'yearly\')), max_students INTEGER NOT NULL CHECK (max_students BETWEEN 0 AND 10000), is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
+      'CREATE UNIQUE INDEX IF NOT EXISTS plans_unique_name_ci ON plans (LOWER(name));',
+      'CREATE TABLE IF NOT EXISTS teacher_plan_assignments (teacher_id UUID PRIMARY KEY REFERENCES teachers(id) ON DELETE CASCADE, plan_id UUID NOT NULL REFERENCES plans(id) ON DELETE RESTRICT, assigned_by UUID NOT NULL REFERENCES teachers(id), assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), source VARCHAR(12) NOT NULL DEFAULT \'manual\' CHECK (source=\'manual\'));',
+      'CREATE INDEX IF NOT EXISTS teacher_plan_assignments_plan_idx ON teacher_plan_assignments(plan_id);',
     ].join('\n'));
     await client.query('COMMIT');
   } catch (error) {
