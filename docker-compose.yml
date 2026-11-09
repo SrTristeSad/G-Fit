@@ -24,7 +24,10 @@ services:
       NODE_ENV: production
       PORT: 3001
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      DATABASE_URL: postgres://gfit:${POSTGRES_PASSWORD}@db:5432/gfit
+      DB_HOST: db
+      DB_USER: gfit
+      DB_NAME: gfit
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
     expose: ["3001"]
   web:
     build: ./web
