@@ -53,6 +53,9 @@ npm test
 - [x] Relatórios por período, turma e aluno: presenças/ausências, justificativas e realizações manuais de exercícios
 - [x] Avaliações funcionais descritivas na ficha do aluno, com registros datados e medições opcionais
 - [x] Correções auditáveis, retirada lógica de registros incorretos e comparação numérica de testes equivalentes
+- [x] Exportação JSON por aluno, exclusiva do professor responsável, com fichas, atividades, presenças e avaliações (inclusive correções)
+- [x] Inventário da ficha, histórico de exportações e respostas sensíveis sem cache no navegador
+- [ ] Política de retenção e exclusão definitiva após revisão de necessidade legal e de backups
 - [x] Gráficos de evolução dos registros por mês e versão para impressão, sem interpretação clínica
 - [x] Compatibilidade com exercícios antigos em texto livre, sem apagar os registros de realização
 - [x] Administração: ver professores, ativar/desativar contas e definir máximo de alunos ativos
@@ -80,7 +83,7 @@ npm test
 - [x] Central de alertas internos com detecção periódica, reconhecimento e resolução automática de incidentes locais
 - [ ] Pix em produção: homologação real, controles de estorno, monitoramento, reconciliação operacional e contabilidade
 - [x] Troca de senha no painel Minha conta, com revogação das sessões
-- [ ] Recuperação de senha, exclusão/exportação de dados, backups e auditoria mais ampla
+- [ ] Recuperação de senha, exclusão/retificação definitiva de dados, backups e auditoria mais ampla
 - [ ] Revisão de segurança, LGPD, testes de integração e implantação HTTPS
 
 **Importante:** esta etapa começa com código próprio e ainda **não é uma importação do openGym**. A integração deverá preservar a licença AGPL-3.0 e os avisos de autoria do projeto original. Por enquanto, nenhuma funcionalidade de exercícios do openGym foi transplantada.
@@ -88,6 +91,18 @@ npm test
 ## Licença
 
 AGPL-3.0-or-later, conforme o arquivo `LICENSE`. Ao disponibilizar uma versão modificada pela rede, observe as obrigações de disponibilização de código-fonte da AGPL.
+
+## Privacidade e portabilidade: exportação por aluno (protótipo)
+
+Na ficha do aluno, a seção **Privacidade e exportação** permite que o professor responsável consulte um **inventário de registros** (atividades atribuídas, realizações, turmas, presenças, avaliações e correções) e baixe os dados em um arquivo **JSON UTF-8**.
+
+**O arquivo contém dados pessoais**, incluindo contatos, objetivos e observações da ficha, prescrições, atividades realizadas, vínculos de turma, presenças e avaliações funcionais. Ele **inclui as avaliações retiradas da lista visível e os valores anteriores registrados em correções**, identificados como tal. A exportação não contém senhas, tokens, outros alunos da turma ou observações compartilhadas da aula que possam descrever terceiros. Os dados são lidos em uma única transação consistente do PostgreSQL e o download é iniciado pelo navegador; o backend não cria um arquivo persistente para a exportação.
+
+**Controles implementados:** autenticação do professor responsável; inexistência de exportação entre contas; requisição POST com confirmação explícita; limite de 6 tentativas a cada 15 minutos (por cliente/rede no protótipo); limite de 10 MiB por arquivo; cabeçalhos `Cache-Control: private, no-store`; e uma trilha de auditoria que registra data, professor, aluno, tamanho e versão da exportação, **sem guardar cópia do conteúdo**. A seção lista as últimas dez exportações daquele aluno.
+
+**Endpoint de inventário:** `GET /api/students/:id/privacy`. **Endpoint de download:** `POST /api/students/:id/export` com `{"confirmation":"EXPORT_SENSITIVE_DATA"}` em JSON. A resposta do segundo endpoint é um arquivo JSON com `Content-Disposition: attachment`. Os testes verificam a proteção de contas, a exclusão de dados de outros alunos da turma, os cabeçalhos de privacidade, o conteúdo e o registro das exportações.
+
+**O que esta etapa não resolve:** solicitação verificada do titular, acesso direto do aluno, anonimização, eliminação definitiva, descarte automático, política completa de retenção, expurgo de backups, criptografia de arquivos exportados, autenticação reforçada antes do download, controle de transferências externas e revisão jurídica. **Arquivar um aluno ou retirar uma avaliação não exclui os dados do banco.** Um arquivo já baixado passa a depender da proteção do dispositivo e de quem o recebe. Não utilize com dados de saúde reais nem como comprovação de adequação à LGPD neste estágio.
 
 ## Avaliações funcionais descritivas
 
