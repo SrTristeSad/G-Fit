@@ -50,6 +50,10 @@ export async function initDatabase() {
       'CREATE TABLE IF NOT EXISTS pix_charges (id UUID PRIMARY KEY, teacher_id UUID NOT NULL REFERENCES teachers(id) ON DELETE CASCADE, plan_id UUID NOT NULL REFERENCES plans(id), created_by UUID NOT NULL REFERENCES teachers(id), asaas_customer_id VARCHAR(100) NOT NULL, provider_payment_id VARCHAR(100) UNIQUE, amount_cents INTEGER NOT NULL CHECK(amount_cents>0), billing_cycle VARCHAR(10) NOT NULL CHECK(billing_cycle IN (\'monthly\',\'yearly\')), due_date DATE NOT NULL, status VARCHAR(20) NOT NULL DEFAULT \'creating\' CHECK(status IN (\'creating\',\'pending\',\'paid\',\'cancelled\',\'review\')), paid_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
       'CREATE UNIQUE INDEX IF NOT EXISTS pix_one_open_per_teacher ON pix_charges(teacher_id) WHERE status IN (\'creating\',\'pending\');',
       'CREATE INDEX IF NOT EXISTS pix_charges_teacher_idx ON pix_charges(teacher_id,created_at DESC);',
+      'ALTER TABLE pix_charges ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;',
+      'ALTER TABLE pix_charges ADD COLUMN IF NOT EXISTS refund_state VARCHAR(20) NOT NULL DEFAULT \'none\';',
+      'ALTER TABLE pix_charges ADD COLUMN IF NOT EXISTS refunded_cents INTEGER NOT NULL DEFAULT 0;',
+      'CREATE INDEX IF NOT EXISTS pix_charges_due_idx ON pix_charges(due_date) WHERE status=\'pending\';',
       'CREATE TABLE IF NOT EXISTS asaas_webhook_events (event_id VARCHAR(180) PRIMARY KEY, event_type VARCHAR(90) NOT NULL, provider_payment_id VARCHAR(100), resolution VARCHAR(24) NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
     ].join('\n'));
     await client.query('COMMIT');
