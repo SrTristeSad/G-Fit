@@ -4,6 +4,7 @@ import { api } from './api.js';
 import StudentProfile from './StudentProfile.jsx';
 import ExerciseLibrary from './ExerciseLibrary.jsx';
 import ClassManager from './ClassManager.jsx';
+import ReportsPanel from './ReportsPanel.jsx';
 import AdminPanel from './AdminPanel.jsx';
 import AccountPanel from './AccountPanel.jsx';
 import BillingPanel from './BillingPanel.jsx';
@@ -153,6 +154,11 @@ function App() {
                   setTab('classes'); setSelectedId(null);
                 }}>Turmas e presença</button>
               )}
+              {!teacher.isAdmin && (
+                <button className={tab === 'reports' ? 'active' : ''} onClick={() => {
+                  setTab('reports'); setSelectedId(null);
+                }}>Relatórios</button>
+              )}
               {teacher.isAdmin && (
                 <button className={tab === 'admin' ? 'active' : ''} onClick={() => {
                   setTab('admin'); setSelectedId(null);
@@ -175,6 +181,7 @@ function App() {
               tab === 'admin' && teacher.isAdmin ? <AdminPanel /> :
               tab === 'library' && !teacher.isAdmin ? <ExerciseLibrary /> :
               tab === 'classes' && !teacher.isAdmin ? <ClassManager /> :
+              tab === 'reports' && !teacher.isAdmin ? <ReportsPanel /> :
               selectedId ? (
                 <StudentProfile id={selectedId} onBack={() => setSelectedId(null)} onChanged={refreshStudents} />
               ) : (
