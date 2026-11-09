@@ -155,7 +155,8 @@ async function processEvent(eventId, eventType, providerPaymentId) {
 }
 
 export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLimit) {
-  const limited = rateLimit({ windowMs: 15 * 60 * 1000, limit: 12, standardHeaders: 'draft-8', legacyHeaders: false });
+  // As rotas administrativas compartilham o limitador; o bloqueio de cobranças duplicadas continua no banco.
+  const limited = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
 
   app.get('/api/admin/billing', requireTeacher, requireAdmin, async (_req, res) => {
     const [charges, customers] = await Promise.all([
