@@ -29,10 +29,10 @@ async function mockPaid(providerId, overrideValue) {
   });
   assert.equal(response.status, 200);
 }
-async function webhook(eventId, providerId, token = webhookToken) {
+async function webhook(eventId, providerId, token = webhookToken, eventType = 'PAYMENT_RECEIVED') {
   return request('/api/webhooks/asaas', {
     method: 'POST',
-    body: { id: eventId, event: 'PAYMENT_RECEIVED', payment: { id: providerId } },
+    body: { id: eventId, event: eventType, payment: { id: providerId } },
     headers: { 'asaas-access-token': token },
   });
 }
@@ -202,4 +202,104 @@ assert.equal(final.data.charges.filter(c => c.status === 'paid').length, 3);
 const audit = await request('/api/admin/audit', { cookie: ca });
 assert.equal(audit.status, 200);
 assert.equal(audit.data.events.filter(e => e.action === 'billing.pix.verified').length, 3);
-console.log('Pix Sandbox: criação, QR, autenticação, conciliação, duplicatas e vigências validados.');
+
+// Ciclo da cobrança: cancelar não paga e não estorna.
+const setNewCustomer = await request('/api/admin/teachers/' + teacher2.id + '/asaas-customer', {
+  method: 'PUT', cookie: ca, body: { customerId: 'cus_TEST_00002' },
+});
+assert.equal(setNewCustomer.status, 200);
+const removable = await request('/api/admin/teachers/' + teacher2.id + '/pix-charge', {
+  method: 'POST', cookie: ca, body: { dueDate: future },
+});
+assert.equal(removable.status, 201, JSON.stringify(removable.data));
+const removableId = removable.data.chargeId;
+const unauthorizedCancel = await request('/api/admin/billing/charges/' + removableId + '/cancel', {
+  method: 'POST', cookie: ct,
+});
+assert.equal(unauthorizedCancel.status, 403);
+const cancelled = await request('/api/admin/billing/charges/' + removableId + '/cancel', {
+  method: 'POST', cookie: ca,
+});
+assert.equal(cancelled.status, 200, JSON.stringify(cancelled.data));
+assert.equal(cancelled.data.cancelled, true);
+const againCancelled = await request('/api/admin/billing/charges/' + removableId + '/cancel', {
+  method: 'POST', cookie: ca,
+});
+assert.equal(againCancelled.status, 200);
+assert.equal(againCancelled.data.alreadyCancelled, true);
+const deletionEvent = await webhook('evt_deleted_000005', removable.data.providerPaymentId,
+  webhookToken, 'PAYMENT_DELETED');
+assert.equal(deletionEvent.status, 200);
+assert.equal(deletionEvent.data.resolution, 'already_cancelled');
+const repeatDeletion = await webhook('evt_deleted_000005', removable.data.providerPaymentId,
+  webhookToken, 'PAYMENT_DELETED');
+assert.equal(repeatDeletion.status, 200);
+assert.equal(repeatDeletion.data.duplicate, true);
+assert.equal((await request('/api/admin/billing', { cookie: ca }))
+  .data.charges.find(c => c.id === removableId).status, 'cancelled');
+
+// A cobrança cancelada não ocupa vaga de cobranças abertas.
+const refundCharge = await request('/api/admin/teachers/' + teacher2.id + '/pix-charge', {
+  method: 'POST', cookie: ca, body: { dueDate: future },
+});
+assert.equal(refundCharge.status, 201, JSON.stringify(refundCharge.data));
+await mockPaid(refundCharge.data.providerPaymentId);
+const refundPaid = await webhook('evt_paid_000006', refundCharge.data.providerPaymentId);
+assert.equal(refundPaid.status, 200, JSON.stringify(refundPaid.data));
+assert.equal(refundPaid.data.settled, true);
+const accessBeforeRefund = await request('/api/account/access', {
+  cookie: (await request('/api/auth/login', {
+    method: 'POST',
+    body: { email: 'dois@example.com', password: 'senha-segunda-123' },
+  })).cookie,
+});
+assert.equal(accessBeforeRefund.status, 200);
+
+const partialRemote = await fetch(mock + '/_test/refund', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ id: refundCharge.data.providerPaymentId, value: 9.9, status: 'DONE' }),
+});
+assert.equal(partialRemote.status, 200);
+const partial = await webhook('evt_partial_000007', refundCharge.data.providerPaymentId,
+  webhookToken, 'PAYMENT_PARTIALLY_REFUNDED');
+assert.equal(partial.status, 200, JSON.stringify(partial.data));
+assert.equal(partial.data.refundState, 'partial');
+assert.equal(partial.data.refundedCents, 990);
+const partialRepeat = await webhook('evt_partial_000007', refundCharge.data.providerPaymentId,
+  webhookToken, 'PAYMENT_PARTIALLY_REFUNDED');
+assert.equal(partialRepeat.data.duplicate, true);
+const firstRefundCheck = await request(
+  '/api/admin/billing/charges/' + refundCharge.data.chargeId + '/refunds/check',
+  { method: 'POST', cookie: ca },
+);
+assert.equal(firstRefundCheck.status, 200);
+assert.equal(firstRefundCheck.data.refundState, 'partial');
+
+const restRefund = await fetch(mock + '/_test/refund', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ id: refundCharge.data.providerPaymentId, value: 20, status: 'DONE' }),
+});
+assert.equal(restRefund.status, 200);
+const fullRefund = await webhook('evt_full_000008', refundCharge.data.providerPaymentId,
+  webhookToken, 'PAYMENT_REFUNDED');
+assert.equal(fullRefund.status, 200, JSON.stringify(fullRefund.data));
+assert.equal(fullRefund.data.refundState, 'full');
+assert.equal(fullRefund.data.refundedCents, 2990);
+const refunded = (await request('/api/admin/billing', { cookie: ca }))
+  .data.charges.find(c => c.id === refundCharge.data.chargeId);
+assert.equal(refunded.status, 'paid'); // histórico de recebimento continua registrado
+assert.equal(refunded.refundState, 'full');
+assert.equal(refunded.refundedCents, 2990);
+assert.equal((await request('/api/admin/billing/charges/' + refundCharge.data.chargeId + '/cancel',
+  { method: 'POST', cookie: ca })).status, 409);
+const afterRefund = await request('/api/admin/access', { cookie: ca });
+assert.equal(afterRefund.status, 200);
+assert.equal(afterRefund.data.accessTerms.find(t => t.teacherId === teacher2.id).status, 'active');
+const financeSummary = await request('/api/admin/billing', { cookie: ca });
+assert.equal(financeSummary.data.summary.cancelledCount, 1);
+assert.equal(financeSummary.data.summary.refundReviewCount, 1);
+assert.equal(Number(financeSummary.data.summary.confirmedRefundedCents), 2990);
+assert.ok(financeSummary.data.summary.paidCount >= 4);
+assert.equal(financeSummary.data.summary.pendingCount, 1); // cobrança divergente continua em revisão
+console.log('Pix Sandbox: cancelamento, estornos parciais e totais, idempotência e revisão manual OK.');
+
