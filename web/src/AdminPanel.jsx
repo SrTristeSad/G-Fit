@@ -3,6 +3,7 @@ import { api } from './api.js';
 import PlansPanel from './PlansPanel.jsx';
 import AccessPanel from './AccessPanel.jsx';
 import BillingPanel from './BillingPanel.jsx';
+import BillingOperations from './BillingOperations.jsx';
 
 function Stat({ label, value, caption }) {
   return (
@@ -265,6 +266,9 @@ export default function AdminPanel() {
         <button className={view === 'billing' ? 'active' : ''} onClick={() => setView('billing')}>
           Financeiro (teste)
         </button>
+        <button className={view === 'operations' ? 'active' : ''} onClick={() => setView('operations')}>
+          Monitoramento
+        </button>
         <button className={view === 'audit' ? 'active' : ''} onClick={() => setView('audit')}>
           Histórico
         </button>
@@ -339,6 +343,7 @@ export default function AdminPanel() {
       {view === 'plans' && <PlansPanel plans={plans} onChanged={reload} />}
       {view === 'access' && <AccessPanel teachers={teachers} accessTerms={accessTerms} refresh={reload} />}
       {view === 'billing' && <BillingPanel admin teachers={teachers} />}
+      {view === 'operations' && <BillingOperations />}
       {view === 'audit' && (
         <div className="card">
           <h2>Histórico de alterações</h2>
