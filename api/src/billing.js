@@ -219,14 +219,22 @@ export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLim
       await client.query('BEGIN');
       const row = await client.query(
         'SELECT t.id,t.is_admin,t.is_active, a.plan_id, p.price_cents,p.billing_cycle,p.is_active AS plan_active, ' +
-        'c.customer_id FROM teachers t LEFT JOIN teacher_plan_assignments a ON a.teacher_id=t.id ' +
+        'c.customer_id, term.revoked_at AS term_revoked_at ' +
+        'FROM teachers t LEFT JOIN teacher_plan_assignments a ON a.teacher_id=t.id ' +
         'LEFT JOIN plans p ON p.id=a.plan_id LEFT JOIN asaas_customers c ON c.teacher_id=t.id ' +
+        'LEFT JOIN teacher_access_terms term ON term.teacher_id=t.id ' +
         'WHERE t.id=$1 FOR UPDATE OF t', [id],
       );
       const v = row.rows[0];
       if (!v || v.is_admin || !v.is_active) {
         await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Professor ativo não encontrado.' });
+      }
+      if (v.term_revoked_at) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          error: 'O prazo de acesso foi revogado. A administração deve autorizar novamente antes de emitir cobrança.',
+        });
       }
       if (!v.plan_id || !v.plan_active || !v.price_cents || !v.customer_id) {
         await client.query('ROLLBACK');
@@ -265,11 +273,15 @@ export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLim
         priceCents: charge.priceCents, dueDate,
       });
       if (!validPaymentId(created.id) || created.externalReference !== chargeId) throw new Error('INVALID_ASAAS_RESPONSE');
-      await db.query(
-        "UPDATE pix_charges SET provider_payment_id=$2,status='pending',updated_at=NOW() WHERE id=$1 AND status='creating'",
+      const update = await db.query(
+        "UPDATE pix_charges SET provider_payment_id=$2,status='pending',updated_at=NOW() " +
+        "WHERE id=$1 AND status='creating' RETURNING status",
         [chargeId, created.id],
       );
-      res.status(201).json({ chargeId, providerPaymentId: created.id, status: 'pending', sandbox: true });
+      const status = update.rows[0]?.status || (await db.query(
+        'SELECT status FROM pix_charges WHERE id=$1', [chargeId],
+      )).rows[0]?.status || 'creating';
+      res.status(201).json({ chargeId, providerPaymentId: created.id, status, sandbox: true });
     } catch (_error) {
       // Uma resposta perdida nao garante que a cobranca nao foi criada.
       // O registro permanece "creating" para conciliacao manual, evitando cobranca duplicada.
