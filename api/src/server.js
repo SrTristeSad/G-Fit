@@ -11,6 +11,7 @@ import { registerBillingRoutes } from './billing.js';
 import { registerAdminAlertRoutes, startAdminAlertScanner } from './admin-alerts.js';
 import { registerWorkoutRoutes, maskToWeekdays } from './workouts.js';
 import { registerClassRoutes } from './classes.js';
+import { registerReportRoutes } from './reports.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -238,6 +239,7 @@ registerBillingRoutes(app, requireTeacher, requireAdmin, rateLimit);
 registerAdminAlertRoutes(app, requireTeacher, requireAdmin, rateLimit);
 registerWorkoutRoutes(app, requireTeacher, requireAccessForNewActivity);
 registerClassRoutes(app, requireTeacher, requireAccessForNewActivity);
+registerReportRoutes(app, requireTeacher);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
