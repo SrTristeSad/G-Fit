@@ -67,6 +67,13 @@ assert.equal(teacher1.activeStudents, 1);
 assert.equal((await request('/api/admin/teachers/' + teacher1.id, {
   method: 'PATCH', cookie: ca, body: { maxStudents: 1 },
 })).status, 200);
+const audit = await request('/api/admin/audit', { cookie: ca });
+assert.equal(audit.status, 200);
+assert.equal(audit.data.events.length, 1);
+assert.equal(audit.data.events[0].action, 'teacher.settings.updated');
+assert.equal(audit.data.events[0].changes.before.maxStudents, 20);
+assert.equal(audit.data.events[0].changes.after.maxStudents, 1);
+assert.equal((await request('/api/admin/audit', { cookie: c1 })).status, 403);
 const full = await request('/api/students', {
   method: 'POST', cookie: c1, body: { name: 'Segundo aluno' },
 });
