@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
 import StudentWorkouts from './StudentWorkouts.jsx';
+import StudentAssessments from './StudentAssessments.jsx';
 
 const blank = {
   name: '', preferredName: '', dateOfBirth: '', phone: '',
@@ -124,6 +125,7 @@ export default function StudentProfile({ id, onBack, onChanged }) {
             </form>
           </section>
           <StudentWorkouts id={id} data={data} run={run} busy={busy} />
+          <StudentAssessments id={id} active={data.student.active} />
         </>
       )}
     </div>
