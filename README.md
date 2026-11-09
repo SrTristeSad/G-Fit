@@ -23,7 +23,7 @@ Plataforma para profissionais de educação física organizarem alunos, turmas e
 docker compose exec api node src/bootstrap-admin.js seu-email@exemplo.com
 ```
 
-O comando mostra uma **senha aleatória de uso inicial**. Guarde-a com segurança, entre no aplicativo com esse e-mail e a senha exibida. A criação do primeiro administrador fica bloqueada quando já existe um administrador.
+O comando mostra uma **senha aleatória de uso inicial**. Guarde-a com segurança, entre no aplicativo com esse e-mail e a senha exibida. Depois, vá até **Minha conta** para alterar a senha. A criação do primeiro administrador fica bloqueada quando já existe um administrador.
 
 > O script deve ser executado **somente no próprio servidor**, por quem controla o Docker. Não existe endpoint HTTP público para conceder permissões administrativas.
 
@@ -49,7 +49,8 @@ npm test
 - [ ] Turmas, avaliações funcionais, prescrição por tempo e relatórios mais completos
 - [ ] Integração com o catálogo do [openGym](https://github.com/DuarteSantos8/openGym)
 - [ ] Pagamentos Pix (cobrança, webhook idempotente e assinatura)
-- [ ] Recuperação de senha, interface para troca de senha, exclusão/exportação de dados, backups e auditoria
+- [x] Troca de senha no painel Minha conta, com revogação das sessões
+- [ ] Recuperação de senha, exclusão/exportação de dados, backups e auditoria
 - [ ] Revisão de segurança, LGPD, testes de integração e implantação HTTPS
 
 **Importante:** esta etapa começa com código próprio e ainda **não é uma importação do openGym**. A integração deverá preservar a licença AGPL-3.0 e os avisos de autoria do projeto original. Por enquanto, nenhuma funcionalidade de exercícios do openGym foi transplantada.
