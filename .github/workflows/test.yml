@@ -1,0 +1,24 @@
+name: Tests
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: API tests
+        working-directory: api
+        run: npm test
+      - name: Build web
+        working-directory: web
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Validate Docker Compose
+        env:
+          POSTGRES_PASSWORD: test_only_not_for_production
+        run: docker compose config --quiet
