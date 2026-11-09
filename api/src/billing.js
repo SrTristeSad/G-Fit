@@ -1,6 +1,7 @@
 // Cobranças Pix via Asaas SANDBOX. Nenhum navegador pode marcar pagamentos como recebidos.
 import { randomUUID } from 'node:crypto';
 import { db } from './db.js';
+import { registerBillingLifecycleRoutes, handleLifecycleEvent } from './billing-lifecycle.js';
 import {
   asaasConfigured, validCustomerId, validPaymentId, validBillDate,
   validWebhookToken, createAsaasCharge, getAsaasPayment, getAsaasPixQr,
@@ -14,7 +15,9 @@ const chargeSelect =
   'p.name AS "planName", c.plan_id AS "planId", c.amount_cents AS "amountCents", ' +
   'c.billing_cycle AS "billingCycle", to_char(c.due_date, \'YYYY-MM-DD\') AS "dueDate", ' +
   'c.status, c.provider_payment_id AS "providerPaymentId", c.created_at AS "createdAt", ' +
-  'c.paid_at AS "paidAt" ';
+  'c.paid_at AS "paidAt", c.cancelled_at AS "cancelledAt", ' +
+  'c.refund_state AS "refundState", c.refunded_cents AS "refundedCents", ' +
+  '(c.status=\'pending\' AND c.due_date<CURRENT_DATE) AS overdue ';
 
 async function listCharges(where, args = []) {
   const result = await db.query(
@@ -157,15 +160,28 @@ async function processEvent(eventId, eventType, providerPaymentId) {
 export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLimit) {
   // As rotas administrativas compartilham o limitador; o bloqueio de cobranças duplicadas continua no banco.
   const limited = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
+  registerBillingLifecycleRoutes(app, requireTeacher, requireAdmin, limited);
 
   app.get('/api/admin/billing', requireTeacher, requireAdmin, async (_req, res) => {
-    const [charges, customers] = await Promise.all([
+    const [charges, customers, metrics] = await Promise.all([
       listCharges(''),
       db.query('SELECT teacher_id AS "teacherId", customer_id AS "customerId" FROM asaas_customers'),
+      db.query([
+        'SELECT',
+        'COUNT(*) FILTER (WHERE status=\'pending\')::INTEGER AS "pendingCount",',
+        'COUNT(*) FILTER (WHERE status=\'pending\' AND due_date<CURRENT_DATE)::INTEGER AS "overdueCount",',
+        'COUNT(*) FILTER (WHERE status=\'creating\')::INTEGER AS "reconciliationCount",',
+        'COUNT(*) FILTER (WHERE status=\'paid\')::INTEGER AS "paidCount",',
+        'COUNT(*) FILTER (WHERE status=\'cancelled\')::INTEGER AS "cancelledCount",',
+        'COUNT(*) FILTER (WHERE refund_state<>\'none\')::INTEGER AS "refundReviewCount",',
+        'COALESCE(SUM(amount_cents) FILTER (WHERE status=\'paid\'),0)::BIGINT AS "grossPaidCents",',
+        'COALESCE(SUM(refunded_cents),0)::BIGINT AS "confirmedRefundedCents"',
+        'FROM pix_charges',
+      ].join(' ')),
     ]);
     res.json({
       sandbox: true, configured: asaasConfigured(),
-      charges, customers: customers.rows,
+      charges, customers: customers.rows, summary: metrics.rows[0],
     });
   });
 
@@ -342,6 +358,22 @@ export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLim
       return res.status(400).json({ error: 'Evento inválido.' });
     }
     const providerId = event.payment?.id;
+    if ([
+      'PAYMENT_DELETED', 'PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED',
+      'PAYMENT_REFUND_IN_PROGRESS', 'PAYMENT_REFUND_DENIED',
+    ].includes(event.event)) {
+      if (!validPaymentId(providerId)) {
+        return res.status(400).json({ error: 'Pagamento inválido.' });
+      }
+      try {
+        const result = await handleLifecycleEvent(event.id, event.event, providerId);
+        return res.json({ received: true, ...result });
+      } catch (_error) {
+        return res.status(503).json({
+          error: 'Conciliação do ciclo da cobrança indisponível; evento pode ser reenviado.',
+        });
+      }
+    }
     if (!['PAYMENT_RECEIVED','PAYMENT_CONFIRMED'].includes(event.event)) {
       await db.query(
         'INSERT INTO asaas_webhook_events (event_id,event_type,provider_payment_id,resolution) ' +
