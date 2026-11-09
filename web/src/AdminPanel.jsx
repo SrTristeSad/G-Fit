@@ -292,6 +292,11 @@ export default function AdminPanel() {
               caption={overview ? overview.studentsArchived + ' arquivados' : ''} />
             <Stat label="Atividades atribuídas" value={overview?.exercisesAssigned ?? '—'} />
             <Stat label="Realizações registradas" value={overview?.completionsLogged ?? '—'} />
+            <Stat label="Turmas ativas" value={overview?.classesActive ?? '—'}
+              caption={overview ? overview.classesArchived + ' arquivadas' : ''} />
+            <Stat label="Aulas cadastradas" value={overview?.classSessions ?? '—'} />
+            <Stat label="Presenças manuais" value={overview?.attendancePresent ?? '—'}
+              caption={overview ? overview.attendanceAbsent + ' faltas registradas' : ''} />
             <Stat label="Novos professores (30 dias)" value={overview?.teachersNew30d ?? '—'} />
             <Stat label="Prazos ativos (manual)" value={overview?.manualAccessActive ?? '—'} />
             <Stat label="Prazos vencidos (manual)" value={overview?.manualAccessExpired ?? '—'} />
