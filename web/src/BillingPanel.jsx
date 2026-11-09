@@ -27,6 +27,16 @@ function Charge({ charge, admin, onRefresh }) {
     finally { setLoading(false); }
   }
 
+  async function recover() {
+    setError('');
+    setLoading(true);
+    try {
+      await api('/api/admin/billing/charges/' + charge.id + '/recover', { method: 'POST' });
+      await onRefresh();
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+
   async function check() {
     setError('');
     setLoading(true);
@@ -64,11 +74,16 @@ function Charge({ charge, admin, onRefresh }) {
             Conferir no Asaas
           </button>
         )}
+        {admin && charge.status === 'creating' && !charge.providerPaymentId && (
+          <button type="button" className="secondary-light" disabled={loading} onClick={recover}>
+            Recuperar no Asaas
+          </button>
+        )}
       </div>
       {qr && (
         <div className="pix-qr">
           <p className="notice">
-            **Sandbox:** este Pix pertence ao ambiente de testes do Asaas e não deve receber dinheiro real.
+            <strong>Sandbox:</strong> este Pix pertence ao ambiente de testes do Asaas e não deve receber dinheiro real.
           </p>
           <img
             alt="QR Code Pix de teste"
