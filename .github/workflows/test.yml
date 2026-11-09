@@ -77,6 +77,7 @@ jobs:
           node api/test/workouts-e2e.mjs
           node api/test/classes-e2e.mjs
           node api/test/reports-e2e.mjs
+          node api/test/assessments-e2e.mjs
           # Segunda janela isolada de autenticação para os testes extensos do Pix.
           docker compose restart api
           ready=0
