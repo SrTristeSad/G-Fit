@@ -2,7 +2,7 @@
 
 Plataforma para profissionais de educação física organizarem alunos, turmas e atividades físicas adaptadas, com foco inicial no público idoso.
 
-> **Fase 2 — protótipo:** cadastro e login de professores, fichas individuais, prescrição simples de atividades e gestão de vagas por professor. **Pix não está integrado.** Não usar com dados reais sensíveis até revisão de segurança, privacidade, backups e adequação à LGPD.
+> **Fase 3 — protótipo:** cadastro e login, fichas, prescrições, administração, planos, vigências e **Pix integrado somente ao ambiente Asaas Sandbox (testes)**. NÃO usar para pagamentos reais. Não usar com dados reais sensíveis até revisão de segurança, privacidade, backups e adequação à LGPD.
 
 ## Tecnologia
 
@@ -58,7 +58,10 @@ npm test
 - [x] Limite inicial de **20 alunos ativos** por professor, editável pelo administrador (0 a 10.000)
 - [ ] Turmas, avaliações funcionais, prescrição por tempo e relatórios mais completos
 - [ ] Integração com o catálogo do [openGym](https://github.com/DuarteSantos8/openGym)
-- [ ] Pagamentos Pix (cobrança, webhook idempotente e assinatura)
+- [x] Pix Asaas Sandbox: cobrança, QR dinâmico, Pix Copia e Cola, webhook autenticado e conciliação idempotente
+- [x] Renovação de vigência após pagamento verificado em sandbox, sem sobrescrever revogação administrativa
+- [x] Recuperação de cobranças inconclusivas por referência externa, sem gerar nova cobrança
+- [ ] Pix em produção: homologação, monitoramento, reembolsos, cancelamentos e reconciliação operacional
 - [x] Troca de senha no painel Minha conta, com revogação das sessões
 - [ ] Recuperação de senha, exclusão/exportação de dados, backups e auditoria mais ampla
 - [ ] Revisão de segurança, LGPD, testes de integração e implantação HTTPS
@@ -79,11 +82,11 @@ A informação de realização de atividade é **declarada manualmente pelo prof
 
 A área **Administração → Visão geral** apresenta estatísticas agregadas de professores, alunos e atividades. **Administração → Professores** permite busca, filtragem, ajustes de limites e ativação/desativação de contas. **Administração → Histórico** mostra as 50 alterações mais recentes feitas em limites e situação de contas, identificando quem realizou a operação. As alterações são registradas na mesma transação no banco de dados.
 
-**Ainda não implementado:** cobrança Pix, receita, confirmação de pagamento e renovação automática de assinaturas pagas; criação de professores por convite; regras de planos baseadas em pagamento; exportação e retenção do histórico de auditoria; monitoramento do servidor. Os números do painel refletem somente os registros da base de dados, não dados financeiros inventados.
+**Ainda não implementado:** pagamentos reais e conciliação financeira de produção; criação de professores por convite; regras de planos baseadas em pagamento; exportação e retenção do histórico de auditoria; monitoramento do servidor. Os números do painel refletem somente os registros da base de dados, não dados financeiros inventados.
 
 ## Planos comerciais — protótipo sem pagamentos
 
-Em **Administração → Planos**, o administrador pode criar planos com nome, descrição, preço em centavos de real (interface em R$), periodicidade mensal ou anual e limite padrão de alunos ativos. O preço é **configurável, mas não é cobrado**: não há checkout, faturas, recibos, Pix ou assinatura paga nesta versão.
+Em **Administração → Planos**, o administrador pode criar planos com nome, descrição, preço em centavos de real (interface em R$), periodicidade mensal ou anual e limite padrão de alunos ativos. O preço é **configurável** e pode ser usado para gerar Pix **somente no Asaas Sandbox**. Não há cobrança ou transferência real nesta versão.
 
 Em **Administração → Professores**, selecione um plano disponível para um professor. Essa ação é uma **atribuição manual**, não comprovação de pagamento. A cota `teachers.max_students` passa a ser o limite do plano, preservando a regra existente de controle de vagas inclusive contra cadastros simultâneos. Ajustes individuais posteriores ainda são possíveis; atribuir outro plano redefine a cota conforme o novo plano. Desvincular um plano **não altera a cota atual** e não apaga alunos. Desativar um plano bloqueia novas atribuições, mas não suspende contas nem modifica professores já vinculados.
 
@@ -96,16 +99,40 @@ Planos publicados não podem ter preço, periodicidade ou cotas editados nesta e
 - `PUT/DELETE /api/admin/teachers/:id/plan` — vínculo manual; apenas administrador.
 - `GET /api/account/plan` — consulta do próprio professor, sem dados de outros usuários.
 
-Criações e alterações ficam registradas em `admin_audit_logs`. É necessário implementar o modelo de cobrança e a verificação de eventos Pix antes de vincular acesso a pagamentos.
+Criações e alterações ficam registradas em `admin_audit_logs`. O módulo Pix Sandbox pode vincular uma vigência a um pagamento de teste verificado no Asaas. Não habilite cobrança real sem homologação.
 
 ## Vigência de acesso (manual, sem pagamentos)
 
 A tela **Administração → Vigências** permite conceder a professores que já têm um plano atribuído um período com data inicial e final, inclusive. Também é possível **renovar manualmente por 1, 3, 6 ou 12 meses** e revogar o prazo. O período máximo configurável na operação inicial é de 733 dias corridos. O status é calculado na leitura do banco PostgreSQL, usando a data corrente do servidor de banco (UTC no ambiente Docker padrão), sem depender de um processo de agendamento.
 
-**Esta ferramenta não confirma pagamento de assinatura.** Uma concessão ou renovação é uma decisão administrativa que fica registrada no histórico; ainda não existe cobrança Pix, emissão de fatura, conciliação financeira ou renovação automática. O estado `active` significa apenas **prazo manual vigente**, nunca `pago`.
+**Esta ferramenta não confirma pagamento de assinatura.** Uma concessão ou renovação feita na aba Vigências é decisão administrativa. Separadamente, o módulo Pix Sandbox pode estender o prazo após consulta do pagamento ao provedor, em um fluxo de testes sem dinheiro real. O estado `active` significa apenas **prazo manual vigente**, nunca `pago`.
 
 Contas anteriores sem prazo configurado mantêm as regras anteriores (status `legacy`) para evitar suspender professores existentes em uma atualização. Quando um prazo é configurado, o vencimento ou a revogação impedem **novos alunos, reativações e novas prescrições**, mas permitem consultar fichas, corrigir informações e registrar atividades já existentes. Não há exclusão automática de alunos nem bloqueio de login.
 
 Para testar no painel: atribua um plano, abra a aba Vigências, conceda um intervalo de datas e confira o resultado no painel do professor. O histórico mostra quem concedeu, renovou ou revogou um prazo.
 
 **Rotas adicionadas:** `GET /api/account/access`, `GET /api/admin/access`, `PUT /api/admin/teachers/:id/access`, `POST /api/admin/teachers/:id/access/renew` e `POST /api/admin/teachers/:id/access/revoke`. As quatro rotas administrativas exigem autenticação com papel administrador.
+
+
+## Pix via Asaas Sandbox — testes apenas
+
+**O G Fit não está pronto para processar dinheiro real.** O backend usa exclusivamente \`https://api-sandbox.asaas.com/v3\`. A chave e o token nunca devem ser colocados no código-fonte, no frontend ou em commits.
+
+1. Crie uma conta **Asaas Sandbox** e configure uma chave Pix no ambiente de testes. Copie a API Key do sandbox (prefixo \`$aact_hmlg_\`).
+2. No arquivo local \`.env\` (não versionado), defina \`ASAAS_API_KEY\` e \`ASAAS_WEBHOOK_TOKEN\`. O segundo valor deve ser um segredo aleatório de 32 a 255 caracteres, diferente da API Key, que será usado como \`authToken\` no webhook.
+3. Reinicie a API: \`docker compose up -d --build\`.
+4. No Asaas Sandbox, crie o webhook apontando para **\`https://SEU-DOMINIO/api/webhooks/asaas\`** (domínio público com HTTPS) e configure o mesmo \`authToken\`. Selecione os eventos \`PAYMENT_RECEIVED\` e \`PAYMENT_CONFIRMED\`. Não exponha o ambiente local publicamente sem HTTPS e revisão de segurança.
+5. No Asaas Sandbox, cadastre um cliente (pagador) de teste e copie seu ID (\`cus_...\`). No G Fit, vincule esse ID ao professor em **Administração → Financeiro (teste)**. O professor também precisa ter um plano com preço maior que zero atribuído.
+6. O professor pode acessar **Pix (teste)** e gerar sua cobrança; ou o administrador pode criá-la para ele. Ambos podem visualizar as cobranças permitidas; o professor vê somente as próprias.
+7. A confirmação de pagamento é recebida via webhook. O G Fit consulta a API do Asaas para verificar ID, valor, tipo PIX, cliente, referência externa e status. Se os dados coincidirem, a cobrança é marcada como recebida **no sandbox** e a vigência é estendida **somente se o plano continuar atribuído e o prazo não estiver revogado**.
+8. Em **Administração → Financeiro (teste)**, a opção **Conferir no Asaas** consulta cobranças conhecidas, e **Recuperar no Asaas** procura cobranças com resposta de criação inconclusiva pelo identificador \`externalReference\`, sem emitir duplicatas.
+
+O PostgreSQL registra os IDs dos eventos do Asaas como chave única, impedindo dupla liquidação e dupla extensão de acesso por reentrega. O histórico administrativo registra decisões financeiras verificadas, mas não contém credenciais.
+
+**Limitações que impedem uso comercial:** ainda faltam conciliação de reembolsos/estornos, cancelamento de cobrança, alertas de webhook parado, gestão segura de contas financeiras, políticas comerciais, verificação de conformidade e testes com a conta oficial em produção. As contas sem prazo configurado continuam com o comportamento legado para preservar compatibilidade com versões anteriores. Cobrança de teste não deve ser tratada como receita real.
+
+### Testes automáticos do Pix
+
+O GitHub Actions utiliza \`docker-compose.ci.yml\` e \`api/test/mock-asaas.mjs\` para simular respostas e pagamentos do Asaas sem chaves reais. **Nunca execute a configuração de CI com dados reais.** O teste cobre autenticação, geração da cobrança e QR Code, webhook idempotente, vencimento, revogação, conferência de valor e recuperação de resposta perdida.
+
+Referências oficiais: https://docs.asaas.com/docs/cobrancas-via-pix ; https://docs.asaas.com/docs/como-implementar-idempotencia-em-webhooks ; https://docs.asaas.com/reference/listar-cobrancas
