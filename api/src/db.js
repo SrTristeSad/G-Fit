@@ -44,6 +44,8 @@ export async function initDatabase() {
       'CREATE UNIQUE INDEX IF NOT EXISTS plans_unique_name_ci ON plans (LOWER(name));',
       'CREATE TABLE IF NOT EXISTS teacher_plan_assignments (teacher_id UUID PRIMARY KEY REFERENCES teachers(id) ON DELETE CASCADE, plan_id UUID NOT NULL REFERENCES plans(id) ON DELETE RESTRICT, assigned_by UUID NOT NULL REFERENCES teachers(id), assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), source VARCHAR(12) NOT NULL DEFAULT \'manual\' CHECK (source=\'manual\'));',
       'CREATE INDEX IF NOT EXISTS teacher_plan_assignments_plan_idx ON teacher_plan_assignments(plan_id);',
+      'CREATE TABLE IF NOT EXISTS teacher_access_terms (teacher_id UUID PRIMARY KEY REFERENCES teachers(id) ON DELETE CASCADE, starts_on DATE NOT NULL, ends_on DATE NOT NULL, revoked_at TIMESTAMPTZ, updated_by UUID NOT NULL REFERENCES teachers(id), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), CHECK (ends_on >= starts_on));',
+      'CREATE INDEX IF NOT EXISTS teacher_access_terms_ends_idx ON teacher_access_terms(ends_on) WHERE revoked_at IS NULL;',
     ].join('\n'));
     await client.query('COMMIT');
   } catch (error) {
