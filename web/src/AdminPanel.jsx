@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
+import PlansPanel from './PlansPanel.jsx';
 
 function Stat({ label, value, caption }) {
   return (
@@ -11,9 +12,10 @@ function Stat({ label, value, caption }) {
   );
 }
 
-function TeacherRow({ teacher, refresh }) {
+function TeacherRow({ teacher, refresh, plans }) {
   const [maxStudents, setMaxStudents] = useState(teacher.maxStudents);
   const [active, setActive] = useState(teacher.isActive);
+  const [selectedPlanId, setSelectedPlanId] = useState(teacher.planId || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -21,7 +23,8 @@ function TeacherRow({ teacher, refresh }) {
   useEffect(() => {
     setMaxStudents(teacher.maxStudents);
     setActive(teacher.isActive);
-  }, [teacher.maxStudents, teacher.isActive]);
+    setSelectedPlanId(teacher.planId || '');
+  }, [teacher.maxStudents, teacher.isActive, teacher.planId]);
 
   async function save() {
     setError('');
@@ -42,6 +45,34 @@ function TeacherRow({ teacher, refresh }) {
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
+  async function assignPlan() {
+    if (!selectedPlanId) return;
+    setError('');
+    setSaved(false);
+    setBusy(true);
+    try {
+      await api('/api/admin/teachers/' + teacher.id + '/plan', {
+        method: 'PUT', body: JSON.stringify({ planId: selectedPlanId }),
+      });
+      await refresh();
+      setSaved(true);
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+
+  async function removePlan() {
+    if (!window.confirm('Desvincular o plano? O limite atual do professor será preservado.')) return;
+    setError('');
+    setSaved(false);
+    setBusy(true);
+    try {
+      await api('/api/admin/teachers/' + teacher.id + '/plan', { method: 'DELETE' });
+      await refresh();
+      setSaved(true);
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+
   return (
     <div className="teacher-record">
       <div>
@@ -65,6 +96,30 @@ function TeacherRow({ teacher, refresh }) {
           {busy ? 'Salvando…' : 'Salvar'}
         </button>
       </div>
+      {!teacher.isAdmin && (
+        <div className="teacher-plan-controls">
+          <label>Plano atribuído manualmente
+            <select value={selectedPlanId} onChange={e => { setSelectedPlanId(e.target.value); setSaved(false); }}>
+              <option value="">Sem plano atribuído</option>
+              {plans.filter(plan => plan.isActive || plan.id === teacher.planId).map(plan => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name}{!plan.isActive ? ' (desativado)' : ''} — {plan.maxStudents} alunos
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="secondary-light" disabled={busy || !selectedPlanId || selectedPlanId === teacher.planId}
+            onClick={assignPlan}>Atribuir plano</button>
+          {teacher.planId && (
+            <button type="button" className="secondary-light" disabled={busy}
+              onClick={removePlan}>Desvincular</button>
+          )}
+          <small className="muted">
+            {teacher.planName ? 'Atual: ' + teacher.planName : 'Nenhum plano vinculado.'}
+            {' '}Atribuir outro plano redefine o limite; não confirma pagamento.
+          </small>
+        </div>
+      )}
       {saved && <p role="status" className="saved-message">Alterações salvas.</p>}
       {error && <p role="alert" className="error">{error}</p>}
     </div>
@@ -85,9 +140,22 @@ function AuditList({ events }) {
         if (before.isActive !== after.isActive) {
           parts.push(after.isActive ? 'Conta reativada' : 'Conta suspensa');
         }
+        let subject = event.targetName || 'Administração';
+        if (event.action === 'plan.created') {
+          subject = 'Plano criado: ' + (event.changes?.name || 'novo plano');
+          parts.push('Preço e limites configurados');
+        } else if (event.action === 'plan.status.updated') {
+          subject = 'Disponibilidade de plano';
+          parts.push(event.changes.after ? 'Plano reativado' : 'Plano desativado');
+        } else if (event.action === 'teacher.plan.assigned') {
+          parts.push('Plano vinculado manualmente');
+          parts.push('Limite: ' + event.changes.previousMaxStudents + ' → ' + event.changes.maxStudents);
+        } else if (event.action === 'teacher.plan.removed') {
+          parts.push('Plano desvinculado; limite preservado');
+        }
         return (
           <li key={event.id}>
-            <strong>{event.targetName || 'Professor'}</strong>
+            <strong>{subject}</strong>
             <span>{parts.join(' · ') || 'Configuração atualizada'}</span>
             <small>
               Por {event.actorName} · {new Date(event.createdAt).toLocaleString('pt-BR')}
@@ -101,6 +169,7 @@ function AuditList({ events }) {
 
 export default function AdminPanel() {
   const [teachers, setTeachers] = useState([]);
+  const [plans, setPlans] = useState([]);
   const [overview, setOverview] = useState(null);
   const [billing, setBilling] = useState(null);
   const [events, setEvents] = useState([]);
@@ -111,15 +180,17 @@ export default function AdminPanel() {
   const [error, setError] = useState('');
 
   const refresh = useCallback(async () => {
-    const [accounts, dashboard, audit] = await Promise.all([
+    const [accounts, dashboard, audit, planList] = await Promise.all([
       api('/api/admin/teachers'),
       api('/api/admin/dashboard'),
       api('/api/admin/audit'),
+      api('/api/admin/plans'),
     ]);
     setTeachers(accounts.teachers);
     setOverview(dashboard.overview);
     setBilling(dashboard.billing);
     setEvents(audit.events);
+    setPlans(planList.plans);
   }, []);
 
   useEffect(() => {
@@ -163,6 +234,9 @@ export default function AdminPanel() {
         <button className={view === 'teachers' ? 'active' : ''} onClick={() => setView('teachers')}>
           Professores
         </button>
+        <button className={view === 'plans' ? 'active' : ''} onClick={() => setView('plans')}>
+          Planos
+        </button>
         <button className={view === 'audit' ? 'active' : ''} onClick={() => setView('audit')}>
           Histórico
         </button>
@@ -197,7 +271,7 @@ export default function AdminPanel() {
               <h2>Financeiro e assinaturas</h2>
               <p className="muted">{billing?.message || 'Sem dados financeiros disponíveis.'}</p>
               <p className="notice">
-                O G Fit ainda não gera cobranças, assinaturas ou relatórios de receita.
+                O G Fit permite configurar planos e atribuí-los manualmente, mas ainda não gera cobranças, assinaturas pagas ou relatórios de receita.
                 Esta área será ligada ao provedor Pix posteriormente.
               </p>
             </div>
@@ -227,15 +301,16 @@ export default function AdminPanel() {
           {!loading && filteredTeachers.length === 0 ?
             <p className="muted">Nenhuma conta corresponde aos filtros.</p> :
             <div className="teacher-list">{filteredTeachers.map(teacher => (
-              <TeacherRow key={teacher.id} teacher={teacher} refresh={reload} />
+              <TeacherRow key={teacher.id} teacher={teacher} refresh={reload} plans={plans} />
             ))}</div>}
         </div>
       )}
+      {view === 'plans' && <PlansPanel plans={plans} onChanged={reload} />}
       {view === 'audit' && (
         <div className="card">
           <h2>Histórico de alterações</h2>
           <p className="muted">
-            Últimas 50 alterações de limites e situação das contas, com autor e horário.
+            Últimas 50 alterações de contas e planos, com autor e horário.
             O histórico é somente leitura.
           </p>
           <AuditList events={events} />
