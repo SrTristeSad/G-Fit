@@ -149,10 +149,46 @@ assert.equal(mismatch.status, 200);
 assert.equal(mismatch.data.review, true);
 assert.equal((await request('/api/account/charges', { cookie: ct })).data.charges[0].status, 'pending');
 assert.equal((await request('/api/account/access', { cookie: ct })).data.access.endsOn, newTerm.data.access.endsOn);
+
+// Caso critico: Asaas criou a cobranca, mas a resposta de criacao foi perdida.
+const accounts = await request('/api/admin/teachers', { cookie: ca });
+const teacher2 = accounts.data.teachers.find(t => t.email === 'dois@example.com');
+assert.ok(teacher2);
+assert.equal((await request('/api/admin/teachers/' + teacher2.id, {
+  method: 'PATCH', cookie: ca, body: { isActive: true },
+})).status, 200);
+assert.equal((await request('/api/admin/teachers/' + teacher2.id + '/plan', {
+  method: 'PUT', cookie: ca, body: { planId: plan.id },
+})).status, 200);
+assert.equal((await request('/api/admin/teachers/' + teacher2.id + '/asaas-customer', {
+  method: 'PUT', cookie: ca, body: { customerId: 'cus_FAIL_ONCE' },
+})).status, 200);
+const failedCreation = await request('/api/admin/teachers/' + teacher2.id + '/pix-charge', {
+  method: 'POST', cookie: ca, body: { dueDate: future },
+});
+assert.equal(failedCreation.status, 502, JSON.stringify(failedCreation.data));
+assert.equal(failedCreation.data.status, 'creating');
+const stuckId = failedCreation.data.chargeId;
+assert.equal((await request('/api/admin/teachers/' + teacher2.id + '/pix-charge', {
+  method: 'POST', cookie: ca, body: { dueDate: future },
+})).status, 409);
+const recovered = await request('/api/admin/billing/charges/' + stuckId + '/recover', {
+  method: 'POST', cookie: ca,
+});
+assert.equal(recovered.status, 200, JSON.stringify(recovered.data));
+assert.equal(recovered.data.status, 'pending');
+assert.ok(recovered.data.providerPaymentId);
+await mockPaid(recovered.data.providerPaymentId);
+const recoveredPaid = await webhook('evt_recovered_000004', recovered.data.providerPaymentId);
+assert.equal(recoveredPaid.status, 200);
+assert.equal(recoveredPaid.data.settled, true);
+const teacher2Bill = await request('/api/admin/billing', { cookie: ca });
+assert.equal(teacher2Bill.data.charges.find(c => c.id === stuckId).status, 'paid');
+
 const final = await request('/api/admin/billing', { cookie: ca });
-assert.equal(final.data.charges.length, 3);
-assert.equal(final.data.charges.filter(c => c.status === 'paid').length, 2);
+assert.equal(final.data.charges.length, 4);
+assert.equal(final.data.charges.filter(c => c.status === 'paid').length, 3);
 const audit = await request('/api/admin/audit', { cookie: ca });
 assert.equal(audit.status, 200);
-assert.equal(audit.data.events.filter(e => e.action === 'billing.pix.verified').length, 2);
+assert.equal(audit.data.events.filter(e => e.action === 'billing.pix.verified').length, 3);
 console.log('Pix Sandbox: criação, QR, autenticação, conciliação, duplicatas e vigências validados.');
