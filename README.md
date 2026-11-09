@@ -65,6 +65,7 @@ npm test
 - [x] Recepção de PAYMENT_DELETED com conciliação idempotente
 - [x] Consulta de estornos parciais/totais e eventos de reembolso, somando apenas devoluções DONE
 - [x] Indicadores administrativos de cobranças pendentes, vencidas, canceladas e estornos em sandbox
+- [x] Monitoramento local de webhooks autenticados, reentregas, falhas HTTP e fila de cobranças para conferência
 - [ ] Pix em produção: homologação real, controles de estorno, monitoramento, reconciliação operacional e contabilidade
 - [x] Troca de senha no painel Minha conta, com revogação das sessões
 - [ ] Recuperação de senha, exclusão/exportação de dados, backups e auditoria mais ampla
@@ -146,6 +147,21 @@ O PostgreSQL registra os IDs dos eventos do Asaas como chave única, impedindo d
 Os indicadores de receita e estorno apresentados no painel são **exclusivamente do sandbox**, sem equivalência com receita contábil real, e não constituem rotina automática de cancelamento ou reembolso. Para usar a conciliação por webhook, inclua os eventos correspondentes na configuração do Asaas Sandbox.
 
 Referências oficiais: [exclusão de cobrança](https://docs.asaas.com/reference/excluir-cobranca), [eventos de cobrança](https://docs.asaas.com/docs/webhook-para-cobrancas) e [regras de estorno](https://docs.asaas.com/docs/estornos).
+
+### Monitoramento operacional local
+
+A aba **Administração → Monitoramento** agora consulta `GET /api/admin/billing/operations`, disponível **somente para administradores**. Ela apresenta:
+
+- número de eventos Asaas únicos autenticados e quantidade total de tentativas;
+- número de respostas com erro registradas (inclusive erros que depois foram resolvidos);
+- eventos recebidos mais de uma vez e eventos cuja última entrega falhou;
+- última entrega registrada no G-Fit e eventos recebidos nas últimas 24 horas;
+- cobranças em criação inconclusiva há mais de 15 minutos, vencidas ainda pendentes ou pendentes por mais de 48 horas;
+- divergências de conciliação que exigem conferência humana.
+
+Esses dados são persistidos no PostgreSQL na tabela `asaas_webhook_attempts`, **sem salvar credenciais ou conteúdo integral dos webhooks**. A autenticação e a validação do evento são verificadas antes de registrar a tentativa. Um erro durante a conciliação resulta em HTTP 503, permitindo nova entrega. As operações de liquidação continuam idempotentes pela tabela `asaas_webhook_events`.
+
+**Limitação importante:** os indicadores são observações **locais**, não representam o estado oficial da fila do Asaas. Nenhuma entrega registrada pode significar falta de atividade; não prova interrupção de webhook. Verifique também os **Logs de Webhooks** do Asaas e a configuração da fila. A documentação informa que a fila pode ser pausada após 15 falhas consecutivas; a recuperação precisa ser realizada no provedor após corrigir o problema. Não existe envio automático de e-mails/alertas, verificação remota periódica nem rotina de monitoramento fora do painel nesta etapa.
 
 ### Testes automáticos do Pix
 
