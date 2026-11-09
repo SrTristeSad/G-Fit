@@ -27,10 +27,6 @@ export function validBillDate(value) {
   return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
 }
 
-export function verifiedPaidPayment(remote, charge) {
-  return remote && charge && validPaymentId(remote.id) &&
-    remote.id === charge.provider_payment_id || false;
-}
 export function matchesPaidCharge(remote, charge) {
   return !!remote && !!charge && remote.billingType === 'PIX' &&
     ['RECEIVED', 'CONFIRMED'].includes(remote.status) &&
