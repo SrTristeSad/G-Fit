@@ -180,4 +180,17 @@ assert.equal((await request('/api/classes/'+groupId,{cookie:teacher1})).data.ses
 assert.equal((await request(attendPath,{
   method:'PUT',cookie:teacher1,body:{records:[{studentId:id3,status:'present'}]},
 })).status,200); // arquivo de aula já existente permanece editável
+const adminPassword=process.env.ADMIN_PASSWORD;
+assert.ok(adminPassword);
+const adminCookie=await login('admin@example.com',adminPassword);
+const adminDashboard=await request('/api/admin/dashboard',{cookie:adminCookie});
+assert.equal(adminDashboard.status,200,JSON.stringify(adminDashboard.data));
+assert.equal(adminDashboard.data.overview.classesActive,0);
+assert.equal(adminDashboard.data.overview.classesArchived,1);
+assert.equal(adminDashboard.data.overview.classSessions,1);
+assert.equal(adminDashboard.data.overview.attendancePresent,1);
+assert.equal(adminDashboard.data.overview.attendanceAbsent,1);
+assert.equal((await request('/api/classes/'+groupId,{cookie:adminCookie})).status,404);
+console.log('Administração: totais agregados de turmas e presenças, sem acesso a fichas privadas OK');
+
 console.log('Turmas: horários, isolamento, limite, matrícula, aulas, presença, arquivo e histórico OK');
