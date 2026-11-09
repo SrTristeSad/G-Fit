@@ -28,6 +28,10 @@ services:
       DB_USER: gfit
       DB_NAME: gfit
       DB_PASSWORD: ${POSTGRES_PASSWORD}
+      ASAAS_API_KEY: ${ASAAS_API_KEY:-}
+      ASAAS_WEBHOOK_TOKEN: ${ASAAS_WEBHOOK_TOKEN:-}
+      ASAAS_TEST_BASE_URL: ${ASAAS_TEST_BASE_URL:-}
+
     expose: ["3001"]
   web:
     build: ./web
