@@ -170,3 +170,17 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
 }
 .teacher-plan-controls .secondary-light { min-height:48px; }
 @media(max-width:700px){.plan-grid{grid-template-columns:1fr;}}
+
+
+/* Termos administrativos de acesso, sem faturamento Pix. */
+.access-list { display:grid; gap:16px; margin-top:22px; }
+.access-row { border:1px solid #dfe8e0; border-radius:15px; padding:20px; background:#fcfefd; display:grid; gap:15px; }
+.access-row p { margin:0; }
+.access-row .section-heading .muted { font-size:14px; margin-top:3px; }
+.access-form { display:flex; flex-wrap:wrap; align-items:end; gap:12px; }
+.access-form label { flex:1; min-width:160px; }
+.access-form input { min-height:48px; }
+.access-actions { display:flex; flex-wrap:wrap; align-items:end; gap:10px; }
+.access-actions label { width:190px; }
+.access-actions select { width:100%; background:white; color:#183329; font:inherit; min-height:45px; padding:10px; border:1px solid #bfc9c0; border-radius:10px; }
+@media(max-width:700px) {.access-form label,.access-form button{width:100%;}.access-actions label{width:100%;}}
