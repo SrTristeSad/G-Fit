@@ -65,6 +65,7 @@ jobs:
           ADMIN_PASSWORD="$(sed -n 's/^Password: //p' /tmp/gfit-admin.txt)"
           test -n "$ADMIN_PASSWORD"
           node api/test/e2e.mjs
+          node api/test/workouts-e2e.mjs
           node api/test/pix-e2e.mjs
           if docker compose exec -T api node src/bootstrap-admin.js outro@example.com > /dev/null 2>&1; then
             echo "ERROR: second admin bootstrap should be blocked"
