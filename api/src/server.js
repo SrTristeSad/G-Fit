@@ -24,6 +24,12 @@ app.set('trust proxy', 1); // API acessível apenas atrás do nginx do Compose.
 app.use(helmet());
 app.use(express.json({ limit: '32kb' }));
 app.use(cookieParser());
+app.use('/api', (_req, res, next) => {
+  // Evita armazenamento de respostas de contas, fichas e avaliações em caches HTTP.
+  res.set('Cache-Control', 'private, no-store, max-age=0');
+  res.set('Pragma', 'no-cache');
+  next();
+});
 app.use((req, res, next) => {
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('sec-fetch-site') === 'cross-site') {
     return res.status(403).json({ error: 'Origem não autorizada.' });
