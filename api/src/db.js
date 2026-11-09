@@ -38,6 +38,8 @@ export async function initDatabase() {
       'CREATE INDEX IF NOT EXISTS exercise_student_idx ON student_exercises(student_id, teacher_id);',
       'CREATE TABLE IF NOT EXISTS exercise_completions (id UUID PRIMARY KEY, teacher_id UUID NOT NULL REFERENCES teachers(id) ON DELETE CASCADE, student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE, exercise_id UUID NOT NULL REFERENCES student_exercises(id) ON DELETE CASCADE, completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
       'CREATE INDEX IF NOT EXISTS completions_student_idx ON exercise_completions(student_id, teacher_id);',
+      'CREATE TABLE IF NOT EXISTS admin_audit_logs (id UUID PRIMARY KEY, actor_id UUID NOT NULL REFERENCES teachers(id), target_teacher_id UUID REFERENCES teachers(id), action VARCHAR(60) NOT NULL, changes JSONB NOT NULL DEFAULT \'{}\'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());',
+      'CREATE INDEX IF NOT EXISTS admin_audit_recent_idx ON admin_audit_logs(created_at DESC);',
     ].join('\n'));
     await client.query('COMMIT');
   } catch (error) {
