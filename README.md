@@ -46,6 +46,9 @@ npm test
 - [x] Exercícios atribuídos individualmente e registros **manuais** de realização
 - [x] Biblioteca privada e editável de exercícios por professor, com pesquisa e arquivamento
 - [x] Planejamento semanal por aluno (segunda a domingo), duração opcional e edição de prescrições
+- [x] Turmas privadas com dias da semana, horário, duração e limite independente de vagas
+- [x] Matrículas por professor com proteção contra exceder capacidade e arquivamento sem perda de histórico
+- [x] Aulas cadastradas por data e presença manual (presente, ausente, justificado), com correção de registros
 - [x] Compatibilidade com exercícios antigos em texto livre, sem apagar os registros de realização
 - [x] Administração: ver professores, ativar/desativar contas e definir máximo de alunos ativos
 - [x] Dashboard administrativo com totais de professores, alunos e atividades
@@ -59,7 +62,7 @@ npm test
 - [x] Bloqueio de novos alunos, reativações e novas prescrições quando o prazo não está ativo (sem apagar fichas)
 - [x] Painel de Vigências com status ativo, agendado, vencido ou revogado e métricas agregadas
 - [x] Limite inicial de **20 alunos ativos** por professor, editável pelo administrador (0 a 10.000)
-- [ ] Turmas, avaliações funcionais, aulas com duração e relatórios de evolução mais completos
+- [ ] Avaliações funcionais, relatórios de evolução, recorrência automática de sessões e integração com calendários
 - [ ] Integração com o catálogo do [openGym](https://github.com/DuarteSantos8/openGym)
 - [x] Pix Asaas Sandbox: cobrança, QR dinâmico, Pix Copia e Cola, webhook autenticado e conciliação idempotente
 - [x] Renovação de vigência após pagamento verificado em sandbox, sem sobrescrever revogação administrativa
@@ -80,6 +83,20 @@ npm test
 ## Licença
 
 AGPL-3.0-or-later, conforme o arquivo `LICENSE`. Ao disponibilizar uma versão modificada pela rede, observe as obrigações de disponibilização de código-fonte da AGPL.
+
+## Turmas, horários e presença
+
+A área do professor **Turmas e presença** permite cadastrar turmas com nome, dias recorrentes da semana, horário de início, duração entre 15 e 240 minutos e **1 a 200 vagas por turma**, além de observações gerais. A lotação de uma turma é distinta da quantidade global de alunos ativos autorizada ao professor: matricular um aluno já cadastrado em várias turmas não cria novas fichas nem consome mais vagas do limite global.
+
+Cada professor vê apenas suas turmas, alunos e presenças. Matrículas ativas exigem que o aluno pertença ao próprio professor, esteja ativo e a turma tenha vagas. Inscrições simultâneas são serializadas por bloqueio transacional da turma no PostgreSQL, evitando ultrapassar a capacidade. Ao **arquivar um aluno**, todas as suas matrículas ativas ficam inativas automaticamente, liberando vagas; reativar a ficha não o rematricula. Ao retirar apenas uma matrícula, a ficha do aluno e as presenças registradas anteriormente são preservadas.
+
+As sessões são cadastradas por **data**, podendo incluir observações. A data é livre para permitir reposições fora dos dias usuais da turma; não existe criação automática de aulas recorrentes. Só pode existir uma sessão por data na mesma turma. Para cada aula, o professor pode marcar **Presente**, **Ausente**, **Justificado** ou limpar um registro incorreto. Nenhuma dessas marcações é automática, nem equivale a prova biométrica de presença. O painel exibe até 60 sessões recentes por turma, com histórico dos alunos que deixaram a turma. Não são coletados dados de dispositivos.
+
+**Alteração e arquivamento de turmas:** informações e lotação podem ser editadas, desde que o novo limite não fique abaixo das matrículas ativas. Desativar uma turma impede novas matrículas e novas sessões, mas conserva as matrículas e registros de aulas existentes. Sessões existentes continuam consultáveis e podem ter a presença corrigida. A exclusão definitiva de turmas não faz parte desta etapa.
+
+**API:** `GET/POST /api/classes`, `GET/PUT /api/classes/:id`, `POST /api/classes/:id/enrollments`, `DELETE /api/classes/:id/enrollments/:studentId`, `POST /api/classes/:id/sessions`, `PUT /api/classes/:id/sessions/:sessionId/attendance`. As rotas de criação de turmas, matrícula e sessões respeitam o controle de vigências do professor; alteração de turma também requer vigência ativa. A correção de presenças existentes e a consulta do histórico permanecem disponíveis. Testes Docker verificam limite de vagas, proteção entre contas, datas inválidas, presença manual e manutenção do histórico após remover uma matrícula ou arquivar um aluno.
+
+**Atenção:** este protótipo não oferece diagnóstico, avaliação clínica nem prescrição física automática. Não utilize dados reais sensíveis antes da revisão de privacidade e segurança e de adequação à LGPD.
 
 ## Biblioteca de exercícios e planejamento semanal
 
