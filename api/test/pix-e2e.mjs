@@ -303,3 +303,27 @@ assert.ok(financeSummary.data.summary.paidCount >= 4);
 assert.equal(financeSummary.data.summary.pendingCount, 1); // cobrança divergente continua em revisão
 console.log('Pix Sandbox: cancelamento, estornos parciais e totais, idempotência e revisão manual OK.');
 
+assert.equal((await request('/api/admin/billing/operations', { cookie: ct })).status, 403);
+assert.equal((await request('/api/admin/billing/operations')).status, 401);
+const operations = await request('/api/admin/billing/operations', { cookie: ca });
+assert.equal(operations.status, 200, JSON.stringify(operations.data));
+assert.equal(operations.data.monitoringScope, 'local_only');
+assert.equal(operations.data.sandbox, true);
+assert.ok(operations.data.webhook.uniqueEvents >= 8);
+assert.ok(operations.data.webhook.deliveryAttempts > operations.data.webhook.uniqueEvents);
+assert.ok(operations.data.webhook.failedAttempts >= 1);
+assert.ok(operations.data.webhook.retriedEvents >= 2);
+assert.equal(operations.data.webhook.currentlyFailed >= 1, true);
+const failedDelivery = operations.data.recentAttempts.find(e => e.eventId === 'evt_before_paid_000001');
+assert.ok(failedDelivery);
+assert.equal(failedDelivery.lastHttpStatus, 503);
+assert.equal(failedDelivery.failureCount, 1);
+const redelivery = operations.data.recentAttempts.find(e => e.eventId === 'evt_paid_000001');
+assert.ok(redelivery);
+assert.equal(redelivery.attempts, 2);
+assert.equal(redelivery.lastHttpStatus, 200);
+assert.ok(operations.data.eventsToReview.some(e => e.resolution === 'mismatch'));
+assert.ok(Array.isArray(operations.data.chargesToReview));
+console.log('Monitoramento: acesso administrativo, falhas HTTP, tentativas repetidas e divergências OK.');
+
+
