@@ -2,6 +2,8 @@
 // A biblioteca não é uma importação do openGym e não prescreve exercícios automaticamente.
 import { randomUUID } from 'node:crypto';
 import { db } from './db.js';
+import { weekdaysToMask, maskToWeekdays } from './weekday.js';
+export { weekdaysToMask, maskToWeekdays };
 
 const validId = value => typeof value === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -12,17 +14,6 @@ const textOrNull = (v, max) => (v === undefined || v === null || v === '') ? nul
 const intRange = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const isOptionalDuration = v => v === undefined || v === null || v === '' || intRange(v, 1, 240);
 
-export function weekdaysToMask(value) {
-  if (value === undefined || value === null) return 0;
-  if (!Array.isArray(value) || value.length > 7 ||
-    value.some(day => !intRange(day, 1, 7)) ||
-    new Set(value).size !== value.length) return null;
-  return value.reduce((mask, day) => mask | (1 << (day - 1)), 0);
-}
-export function maskToWeekdays(mask) {
-  if (!intRange(mask, 0, 127)) return [];
-  return [1, 2, 3, 4, 5, 6, 7].filter(day => mask & (1 << (day - 1)));
-}
 function normalizeDuration(v) {
   return (v === undefined || v === null || v === '') ? null : v;
 }
