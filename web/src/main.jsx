@@ -4,6 +4,7 @@ import { api } from './api.js';
 import StudentProfile from './StudentProfile.jsx';
 import AdminPanel from './AdminPanel.jsx';
 import AccountPanel from './AccountPanel.jsx';
+import BillingPanel from './BillingPanel.jsx';
 import './style.css';
 
 function App() {
@@ -145,11 +146,17 @@ function App() {
                   setTab('admin'); setSelectedId(null);
                 }}>Administração</button>
               )}
+              {!teacher.isAdmin && (
+                <button className={tab === 'billing' ? 'active' : ''} onClick={() => {
+                  setTab('billing'); setSelectedId(null);
+                }}>Pix (teste)</button>
+              )}
               <button className={tab === 'account' ? 'active' : ''} onClick={() => {
                 setTab('account'); setSelectedId(null);
               }}>Minha conta</button>
             </nav>
-            {tab === 'account' ? <AccountPanel onPasswordChanged={() => {
+            {tab === 'billing' && !teacher.isAdmin ? <BillingPanel /> :
+              tab === 'account' ? <AccountPanel onPasswordChanged={() => {
                 setTeacher(null); setStudents([]); setTab('students'); setSelectedId(null);
                 setError('Senha alterada. Entre novamente com a nova senha.');
               }} /> :
