@@ -52,6 +52,9 @@ npm test
 - [x] Atribuição e remoção manual de planos por professor, com atualização atômica da cota
 - [x] Ativação e desativação de planos; bloqueio de novos vínculos com plano desativado
 - [x] Histórico auditável de criação, ativação e atribuição de planos
+- [x] Prazos de acesso opcionais por professor com datas de início e término, renovação e revogação manuais
+- [x] Bloqueio de novos alunos, reativações e novas prescrições quando o prazo não está ativo (sem apagar fichas)
+- [x] Painel de Vigências com status ativo, agendado, vencido ou revogado e métricas agregadas
 - [x] Limite inicial de **20 alunos ativos** por professor, editável pelo administrador (0 a 10.000)
 - [ ] Turmas, avaliações funcionais, prescrição por tempo e relatórios mais completos
 - [ ] Integração com o catálogo do [openGym](https://github.com/DuarteSantos8/openGym)
@@ -76,7 +79,7 @@ A informação de realização de atividade é **declarada manualmente pelo prof
 
 A área **Administração → Visão geral** apresenta estatísticas agregadas de professores, alunos e atividades. **Administração → Professores** permite busca, filtragem, ajustes de limites e ativação/desativação de contas. **Administração → Histórico** mostra as 50 alterações mais recentes feitas em limites e situação de contas, identificando quem realizou a operação. As alterações são registradas na mesma transação no banco de dados.
 
-**Ainda não implementado:** cobrança Pix, receita, confirmação de pagamento, renovação e vencimento de assinaturas; criação de professores por convite; regras de planos baseadas em pagamento; exportação e retenção do histórico de auditoria; monitoramento do servidor. Os números do painel refletem somente os registros da base de dados, não dados financeiros inventados.
+**Ainda não implementado:** cobrança Pix, receita, confirmação de pagamento e renovação automática de assinaturas pagas; criação de professores por convite; regras de planos baseadas em pagamento; exportação e retenção do histórico de auditoria; monitoramento do servidor. Os números do painel refletem somente os registros da base de dados, não dados financeiros inventados.
 
 ## Planos comerciais — protótipo sem pagamentos
 
@@ -94,3 +97,15 @@ Planos publicados não podem ter preço, periodicidade ou cotas editados nesta e
 - `GET /api/account/plan` — consulta do próprio professor, sem dados de outros usuários.
 
 Criações e alterações ficam registradas em `admin_audit_logs`. É necessário implementar o modelo de cobrança e a verificação de eventos Pix antes de vincular acesso a pagamentos.
+
+## Vigência de acesso (manual, sem pagamentos)
+
+A tela **Administração → Vigências** permite conceder a professores que já têm um plano atribuído um período com data inicial e final, inclusive. Também é possível **renovar manualmente por 1, 3, 6 ou 12 meses** e revogar o prazo. O período máximo configurável na operação inicial é de 733 dias corridos. O status é calculado na leitura do banco PostgreSQL, usando a data corrente do servidor de banco (UTC no ambiente Docker padrão), sem depender de um processo de agendamento.
+
+**Esta ferramenta não confirma pagamento de assinatura.** Uma concessão ou renovação é uma decisão administrativa que fica registrada no histórico; ainda não existe cobrança Pix, emissão de fatura, conciliação financeira ou renovação automática. O estado `active` significa apenas **prazo manual vigente**, nunca `pago`.
+
+Contas anteriores sem prazo configurado mantêm as regras anteriores (status `legacy`) para evitar suspender professores existentes em uma atualização. Quando um prazo é configurado, o vencimento ou a revogação impedem **novos alunos, reativações e novas prescrições**, mas permitem consultar fichas, corrigir informações e registrar atividades já existentes. Não há exclusão automática de alunos nem bloqueio de login.
+
+Para testar no painel: atribua um plano, abra a aba Vigências, conceda um intervalo de datas e confira o resultado no painel do professor. O histórico mostra quem concedeu, renovou ou revogou um prazo.
+
+**Rotas adicionadas:** `GET /api/account/access`, `GET /api/admin/access`, `PUT /api/admin/teachers/:id/access`, `POST /api/admin/teachers/:id/access/renew` e `POST /api/admin/teachers/:id/access/revoke`. As quatro rotas administrativas exigem autenticação com papel administrador.
