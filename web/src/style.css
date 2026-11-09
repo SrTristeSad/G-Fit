@@ -184,3 +184,18 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
 .access-actions label { width:190px; }
 .access-actions select { width:100%; background:white; color:#183329; font:inherit; min-height:45px; padding:10px; border:1px solid #bfc9c0; border-radius:10px; }
 @media(max-width:700px) {.access-form label,.access-form button{width:100%;}.access-actions label{width:100%;}}
+
+
+/* Pix Sandbox: cobranças e comprovacao sempre verificadas pelo servidor */
+.billing-form { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin:18px 0; }
+.billing-form label { min-width:230px; flex:1; }
+.billing-charges { display:grid; gap:14px; margin-top:20px; }
+.billing-charge { display:grid; gap:8px; border:1px solid #dce6df; border-radius:14px; padding:18px; background:#fbfdfb; }
+.billing-charge .section-heading { align-items:flex-start; }
+.billing-charge small { overflow-wrap:anywhere; }
+.pix-qr { display:grid; gap:12px; justify-items:start; padding:18px; background:#eef6ec; border-radius:12px; max-width:560px; }
+.pix-qr img { object-fit:contain; max-width:100%; background:white; border:1px solid #dce6df; padding:8px; }
+.pix-qr label { width:100%; }
+.pix-qr textarea { font-family:ui-monospace,monospace; word-break:break-all; resize:vertical; }
+.billing-charge .saved-message { font-weight:700; }
+@media(max-width:700px) {.billing-form label,.billing-form button{width:100%;}}
