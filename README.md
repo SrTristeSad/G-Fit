@@ -66,6 +66,7 @@ npm test
 - [x] Consulta de estornos parciais/totais e eventos de reembolso, somando apenas devoluções DONE
 - [x] Indicadores administrativos de cobranças pendentes, vencidas, canceladas e estornos em sandbox
 - [x] Monitoramento local de webhooks autenticados, reentregas, falhas HTTP e fila de cobranças para conferência
+- [x] Central de alertas internos com detecção periódica, reconhecimento e resolução automática de incidentes locais
 - [ ] Pix em produção: homologação real, controles de estorno, monitoramento, reconciliação operacional e contabilidade
 - [x] Troca de senha no painel Minha conta, com revogação das sessões
 - [ ] Recuperação de senha, exclusão/exportação de dados, backups e auditoria mais ampla
@@ -163,8 +164,24 @@ Esses dados são persistidos no PostgreSQL na tabela `asaas_webhook_attempts`, *
 
 **Limitação importante:** os indicadores são observações **locais**, não representam o estado oficial da fila do Asaas. Nenhuma entrega registrada pode significar falta de atividade; não prova interrupção de webhook. Verifique também os **Logs de Webhooks** do Asaas e a configuração da fila. A documentação informa que a fila pode ser pausada após 15 falhas consecutivas; a recuperação precisa ser realizada no provedor após corrigir o problema. Não existe envio automático de e-mails/alertas, verificação remota periódica nem rotina de monitoramento fora do painel nesta etapa.
 
+### Central de alertas (administração)
+
+**Administração → Alertas** apresenta notificações internas do G-Fit, sem envio de e-mail, SMS ou notificações push. O servidor verifica os dados locais ao iniciar e a cada **15 minutos**. Administradores também podem executar **Verificar agora**, sujeitos a um limite de solicitações. A verificação é protegida contra execução simultânea por instâncias diferentes do servidor.
+
+Os alertas são criados a partir de sinais observáveis no PostgreSQL: cobranças em criação há mais de 15 minutos, cobranças vencidas ou pendentes há mais de 48 horas, falhas na última entrega de um webhook autenticado, divergências de eventos e estornos pendentes ou que exigem revisão. O scanner **não entra em contato com o Asaas e não emite cobranças**. Um problema persistente mantém o mesmo alerta, evitando duplicações.
+
+Os avisos têm os seguintes estados:
+
+- **Novo:** condição detectada e ainda não reconhecida.
+- **Em análise:** um administrador marcou o problema para investigação; a condição continua ativa.
+- **Resolvido:** o scanner verificou que a condição local desapareceu. Se voltar a ocorrer, o alerta é reaberto automaticamente.
+
+Reconhecimentos são registrados na auditoria administrativa. O histórico e os estados ficam nas tabelas `admin_alerts` e `admin_alert_scanner`. Endpoints: `GET /api/admin/alerts`, `POST /api/admin/alerts/scan` e `PATCH /api/admin/alerts/:id/acknowledge`, exclusivos do administrador.
+
+**Limites:** a detecção não equivale a acompanhamento do estado da fila do Asaas, nem à confirmação de pagamento. O painel deve ser aberto para consultar os alertas; não existe envio externo de aviso ou rotina de recuperação automática da fila remota. Em caso de falha, verificar os logs oficiais do provedor e corrigir a causa antes de reativar a fila.
+
 ### Testes automáticos do Pix
 
-O GitHub Actions utiliza `docker-compose.ci.yml` e `api/test/mock-asaas.mjs` para simular respostas e pagamentos do Asaas sem chaves reais. **Nunca execute a configuração de CI com dados reais.** O teste cobre autenticação, geração da cobrança e QR Code, webhook idempotente, vigências, conferência de valor, recuperação de resposta perdida, cancelamento de pendências e estornos parciais ou totais, sem movimentar dinheiro.
+O GitHub Actions utiliza `docker-compose.ci.yml` e `api/test/mock-asaas.mjs` para simular respostas e pagamentos do Asaas sem chaves reais. **Nunca execute a configuração de CI com dados reais.** O teste cobre autenticação, geração da cobrança e QR Code, webhook idempotente, vigências, conferência de valor, recuperação de resposta perdida, cancelamento de pendências, estornos e ciclo de alertas internos (deduplicação, reconhecimento, resolução e permissões), sem movimentar dinheiro.
 
 Referências oficiais: https://docs.asaas.com/docs/cobrancas-via-pix ; https://docs.asaas.com/docs/como-implementar-idempotencia-em-webhooks ; https://docs.asaas.com/reference/listar-cobrancas
