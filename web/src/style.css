@@ -154,3 +154,19 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
   .admin-stat { padding:13px; }
   .admin-stat > strong { font-size:27px; }
 }
+
+
+/* Planos configurados pela administracao (sem cobranca ativa) */
+.plan-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:22px; }
+.plan-card { display:grid; align-content:start; gap:10px; border:1px solid #dbe6dd; padding:20px; border-radius:15px; background:#fcfefd; }
+.plan-card > .plan-price { font-size:27px; color:#165b40; }
+.plan-card p { margin:4px 0 10px; }
+.teacher-plan-controls { display:flex; align-items:end; flex-wrap:wrap; gap:10px; padding-top:12px; border-top:1px solid #e6ece7; }
+.teacher-plan-controls label { flex:1; min-width:190px; }
+.teacher-plan-controls small { width:100%; }
+.teacher-plan-controls select, .form-grid select {
+  padding:12px; background:white; color:#183329; font:inherit;
+  border:1px solid #bfc9c0; border-radius:10px; min-height:48px; width:100%;
+}
+.teacher-plan-controls .secondary-light { min-height:48px; }
+@media(max-width:700px){.plan-grid{grid-template-columns:1fr;}}
