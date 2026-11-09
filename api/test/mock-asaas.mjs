@@ -42,6 +42,18 @@ const server = createServer(async (req, res) => {
       const data = [...payments.values()].filter(item => item.externalReference === ref);
       return send(res, 200, { data, hasMore: false, totalCount: data.length });
     }
+    if (req.method === 'DELETE' && /^\/v3\/payments\/pay_[A-Za-z0-9_-]+$/.test(path)) {
+      const id = path.split('/')[3];
+      const record = payments.get(id);
+      if (!record) return send(res, 404, { error: 'Not found' });
+      if (record.deleted === true) return send(res, 200, record);
+      if (!['PENDING', 'OVERDUE'].includes(record.status)) {
+        return send(res, 400, { error: 'Payment is not removable' });
+      }
+      record.deleted = true;
+      record.status = 'DELETED';
+      return send(res, 200, record);
+    }
     if (req.method === 'GET' && /^\/v3\/payments\/pay_[A-Za-z0-9_-]+$/.test(path)) {
       const id = path.split('/')[3];
       return payments.has(id) ? send(res, 200, payments.get(id)) :
@@ -61,6 +73,29 @@ const server = createServer(async (req, res) => {
       if (!record) return send(res, 404, { error: 'Not found' });
       record.status = 'RECEIVED';
       if (body.overrideValue !== undefined) record.value = body.overrideValue;
+      return send(res, 200, record);
+    }
+    if (req.method === 'POST' && path === '/_test/mark-overdue') {
+      const record = payments.get(body.id);
+      if (!record) return send(res, 404, { error: 'Not found' });
+      if (record.status !== 'PENDING') return send(res, 409, { error: 'Not pending' });
+      record.status = 'OVERDUE';
+      return send(res, 200, record);
+    }
+    if (req.method === 'POST' && path === '/_test/refund') {
+      const record = payments.get(body.id);
+      if (!record) return send(res, 404, { error: 'Not found' });
+      if (!['RECEIVED', 'CONFIRMED', 'REFUNDED', 'PARTIALLY_REFUNDED'].includes(record.status)) {
+        return send(res, 409, { error: 'Not paid' });
+      }
+      if (!Number.isFinite(body.value) || body.value <= 0 || !['DONE', 'PENDING'].includes(body.status)) {
+        return send(res, 400, { error: 'Invalid mock refund' });
+      }
+      if (!record.refunds) record.refunds = [];
+      record.refunds.push({ status: body.status, value: body.value });
+      const refunded = record.refunds.filter(x => x.status === 'DONE').reduce((n, x) => n + x.value, 0);
+      if (Math.round(refunded * 100) >= Math.round(record.value * 100)) record.status = 'REFUNDED';
+      else if (refunded > 0) record.status = 'PARTIALLY_REFUNDED';
       return send(res, 200, record);
     }
     return send(res, 404, { error: 'Not found' });
