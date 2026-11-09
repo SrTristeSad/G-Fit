@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api } from './api.js';
 import StudentProfile from './StudentProfile.jsx';
+import ExerciseLibrary from './ExerciseLibrary.jsx';
 import AdminPanel from './AdminPanel.jsx';
 import AccountPanel from './AccountPanel.jsx';
 import BillingPanel from './BillingPanel.jsx';
@@ -141,6 +142,11 @@ function App() {
               <button className={tab === 'students' ? 'active' : ''} onClick={() => { setTab('students'); setSelectedId(null); }}>
                 Meus alunos
               </button>
+              {!teacher.isAdmin && (
+                <button className={tab === 'library' ? 'active' : ''} onClick={() => {
+                  setTab('library'); setSelectedId(null);
+                }}>Biblioteca de exercícios</button>
+              )}
               {teacher.isAdmin && (
                 <button className={tab === 'admin' ? 'active' : ''} onClick={() => {
                   setTab('admin'); setSelectedId(null);
@@ -161,6 +167,7 @@ function App() {
                 setError('Senha alterada. Entre novamente com a nova senha.');
               }} /> :
               tab === 'admin' && teacher.isAdmin ? <AdminPanel /> :
+              tab === 'library' && !teacher.isAdmin ? <ExerciseLibrary /> :
               selectedId ? (
                 <StudentProfile id={selectedId} onBack={() => setSelectedId(null)} onChanged={refreshStudents} />
               ) : (
