@@ -4,7 +4,7 @@ import { db } from './db.js';
 import {
   asaasConfigured, validCustomerId, validPaymentId, validBillDate,
   validWebhookToken, createAsaasCharge, getAsaasPayment, getAsaasPixQr,
-  matchesPaidCharge,
+  matchesPaidCharge, findAsaasPaymentsByReference,
 } from './asaas.js';
 
 const uuid = x => typeof x === 'string' &&
@@ -343,6 +343,51 @@ export function registerBillingRoutes(app, requireTeacher, requireAdmin, rateLim
       res.json({ received: true, ...result });
     } catch (_error) {
       res.status(503).json({ error: 'Falha de conciliação; o provedor poderá reenviar o evento.' });
+    }
+  });
+
+  // Recupera uma criacao inconclusiva sem jamais criar outra cobranca.
+  app.post('/api/admin/billing/charges/:id/recover', requireTeacher, requireAdmin, limited, async (req, res) => {
+    if (!asaasConfigured()) return providerUnavailable(res);
+    if (!uuid(req.params.id)) return res.status(400).json({ error: 'Identificador inválido.' });
+    const result = await db.query('SELECT * FROM pix_charges WHERE id=$1', [req.params.id]);
+    const charge = result.rows[0];
+    if (!charge) return res.status(404).json({ error: 'Cobrança não encontrada.' });
+    if (charge.provider_payment_id) {
+      return res.status(409).json({ error: 'Cobrança já possui ID Asaas. Utilize Conferir no Asaas.' });
+    }
+    if (charge.status !== 'creating') {
+      return res.status(409).json({ error: 'Somente cobranças em conciliação podem ser recuperadas.' });
+    }
+    try {
+      const list = await findAsaasPaymentsByReference(charge.id);
+      if (!Array.isArray(list.data) || list.hasMore || list.data.length !== 1) {
+        return res.status(409).json({
+          error: 'Consulta inconclusiva no Asaas. A cobrança permanece bloqueada para evitar duplicidade.',
+          matches: Array.isArray(list.data) ? list.data.length : null,
+        });
+      }
+      const remoteId = list.data[0]?.id;
+      if (!validPaymentId(remoteId)) throw new Error('INVALID_PAYMENT_ID');
+      const remote = await getAsaasPayment(remoteId);
+      if (remote.id !== remoteId || remote.externalReference !== charge.id ||
+          remote.customer !== charge.asaas_customer_id || remote.billingType !== 'PIX' ||
+          Math.round(Number(remote.value) * 100) !== charge.amount_cents) {
+        return res.status(409).json({ error: 'Cobrança remota não corresponde ao registro local. Revisão necessária.' });
+      }
+      const update = await db.query(
+        "UPDATE pix_charges SET provider_payment_id=$2,status='pending',updated_at=NOW() " +
+        "WHERE id=$1 AND status='creating' AND provider_payment_id IS NULL RETURNING id",
+        [charge.id, remote.id],
+      );
+      if (!update.rows.length) return res.status(409).json({ error: 'Cobrança já atualizada. Recarregue o painel.' });
+      if (['RECEIVED','CONFIRMED'].includes(remote.status)) {
+        const outcome = await settleVerifiedPayment('recover_' + charge.id, 'ADMIN_RECOVERY', remote);
+        return res.json({ chargeId: charge.id, status: 'paid', outcome, sandbox: true });
+      }
+      res.json({ chargeId: charge.id, status: 'pending', providerPaymentId: remote.id, sandbox: true });
+    } catch (_error) {
+      res.status(502).json({ error: 'Falha ao reconciliar com o Asaas. A cobrança não foi duplicada.' });
     }
   });
 
