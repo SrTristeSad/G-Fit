@@ -7,6 +7,7 @@ import { db, initDatabase } from './db.js';
 import { registerAdminReadRoutes } from './admin.js';
 import { registerPlanRoutes } from './plans.js';
 import { registerAccessRoutes, requireAccessForNewActivity } from './access.js';
+import { registerBillingRoutes } from './billing.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -230,6 +231,7 @@ app.patch('/api/admin/teachers/:id', requireTeacher, requireAdmin, async (req, r
 registerAdminReadRoutes(app, requireTeacher, requireAdmin);
 registerPlanRoutes(app, requireTeacher, requireAdmin);
 registerAccessRoutes(app, requireTeacher, requireAdmin);
+registerBillingRoutes(app, requireTeacher, requireAdmin, rateLimit);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
