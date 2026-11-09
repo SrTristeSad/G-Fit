@@ -61,13 +61,13 @@ function serializeAccess(access) {
 export function registerAccessRoutes(app, requireTeacher, requireAdmin) {
   app.get('/api/account/access', requireTeacher, async (req, res) => {
     const access = await readAccess(db, req.teacher.id);
-    res.json({ access: serializeAccess(access), source: 'admin_manual', billingConnected: false });
+    res.json({ access: serializeAccess(access), source: access ? 'admin_manual' : null, billingConnected: false });
   });
 
   app.get('/api/admin/access', requireTeacher, requireAdmin, async (_req, res) => {
     const result = await db.query(
       'SELECT teacher_id AS "teacherId", to_char(starts_on, \'YYYY-MM-DD\') AS "startsOn", ' +
-      'to_char(ends_on, \'YYYY-MM-DD\') AS "endsOn", revoked_at AS "revokedAt", ' +
+      'to_char(ends_on, \'YYYY-MM-DD\') AS "endsOn", revoked_at AS "revokedAt", updated_at AS "updatedAt", ' +
       'CASE WHEN revoked_at IS NOT NULL THEN \'revoked\' WHEN starts_on > CURRENT_DATE THEN \'scheduled\' ' +
       'WHEN ends_on < CURRENT_DATE THEN \'expired\' ELSE \'active\' END AS status ' +
       'FROM teacher_access_terms ORDER BY ends_on ASC',
