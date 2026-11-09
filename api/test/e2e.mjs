@@ -52,6 +52,12 @@ const admin = await request('/api/auth/login', {
 });
 assert.equal(admin.status, 200, JSON.stringify(admin.data));
 assert.equal(admin.data.teacher.isAdmin, true);
+const dashboard = await request('/api/admin/dashboard', { cookie: admin.cookie });
+assert.equal(dashboard.status, 200);
+assert.equal(dashboard.data.overview.teachersTotal, 2);
+assert.equal(dashboard.data.overview.studentsActive, 1);
+assert.equal(dashboard.data.billing.connected, false);
+assert.equal((await request('/api/admin/dashboard', { cookie: c1 })).status, 403);
 const ca = admin.cookie;
 const teachers = await request('/api/admin/teachers', { cookie: ca });
 assert.equal(teachers.status, 200);
