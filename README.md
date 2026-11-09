@@ -50,6 +50,8 @@ npm test
 - [x] Matrículas por professor com proteção contra exceder capacidade e arquivamento sem perda de histórico
 - [x] Indicadores administrativos agregados de turmas, aulas e presenças, sem exposição de alunos individuais
 - [x] Aulas cadastradas por data e presença manual (presente, ausente, justificado), com correção de registros
+- [x] Relatórios por período, turma e aluno: presenças/ausências, justificativas e realizações manuais de exercícios
+- [x] Gráficos de evolução dos registros por mês e versão para impressão, sem interpretação clínica
 - [x] Compatibilidade com exercícios antigos em texto livre, sem apagar os registros de realização
 - [x] Administração: ver professores, ativar/desativar contas e definir máximo de alunos ativos
 - [x] Dashboard administrativo com totais de professores, alunos e atividades
@@ -63,7 +65,7 @@ npm test
 - [x] Bloqueio de novos alunos, reativações e novas prescrições quando o prazo não está ativo (sem apagar fichas)
 - [x] Painel de Vigências com status ativo, agendado, vencido ou revogado e métricas agregadas
 - [x] Limite inicial de **20 alunos ativos** por professor, editável pelo administrador (0 a 10.000)
-- [ ] Avaliações funcionais, relatórios de evolução, recorrência automática de sessões e integração com calendários
+- [ ] Avaliações funcionais, relatórios clínicos de evolução validados por profissional, recorrência automática de sessões e integração com calendários
 - [ ] Integração com o catálogo do [openGym](https://github.com/DuarteSantos8/openGym)
 - [x] Pix Asaas Sandbox: cobrança, QR dinâmico, Pix Copia e Cola, webhook autenticado e conciliação idempotente
 - [x] Renovação de vigência após pagamento verificado em sandbox, sem sobrescrever revogação administrativa
@@ -84,6 +86,20 @@ npm test
 ## Licença
 
 AGPL-3.0-or-later, conforme o arquivo `LICENSE`. Ao disponibilizar uma versão modificada pela rede, observe as obrigações de disponibilização de código-fonte da AGPL.
+
+## Relatórios de frequência e atividades
+
+Na área do professor, abra **Relatórios** para consultar registros em um período de até **366 dias inclusivos** (padrão: 90 dias). Os filtros permitem visualizar todas as turmas e alunos ou selecionar um aluno específico. Os dados também abrangem alunos e turmas arquivados, desde que seus registros anteriores continuem no banco.
+
+A visão geral exibe quantidade de aulas cadastradas, presenças, ausências, justificativas, realizações de atividades e número de alunos com registros no período. Há tabelas separadas por turma e por aluno e um gráfico mensal de **presenças efetivamente registradas** e **realizações de exercícios**. Na visão individual, o professor pode consultar frequência por turma, atividades existentes na ficha e as últimas 100 marcações de presença. A opção **Imprimir relatório** utiliza a impressão do navegador; guarde as cópias com segurança.
+
+A **taxa de frequência registrada** é calculada como `presenças / (presenças + ausências) × 100`. Ausências justificadas e aulas sem qualquer registro ficam **fora do denominador**; quando não há marcações de presença ou ausência, o sistema exibe **Sem base de cálculo**, não 0%. Nenhuma falta é presumida para o aluno que não tem registro naquela aula. Uma realização de exercício representa uma marcação manual do professor, não uma medição automática de desempenho nem prova de recuperação física.
+
+Datas de aulas usam o calendário indicado no cadastro, enquanto atividades são agrupadas pelo dia de registro em **UTC**. A seleção de período restringe o resultado do relatório sem modificar o histórico. Caso um exercício tenha sido excluído em versões anteriores, seu histórico de realizações pode ter sido removido pela regra antiga de exclusão; o relatório não consegue recuperar registros apagados.
+
+**Endpoints (exclusivos do professor autenticado):** `GET /api/reports/overview?from=AAAA-MM-DD&to=AAAA-MM-DD` e `GET /api/reports/students/:id?from=AAAA-MM-DD&to=AAAA-MM-DD`. Ambos rejeitam datas inválidas ou intervalos superiores a 366 dias. O segundo endpoint exige que o aluno pertença ao professor autenticado; o administrador não recebe acesso a relatórios individuais de outros professores. Os testes de integração cobrem filtragem, contagens, ausência de dados e isolamento entre contas.
+
+**Importante:** estes são **relatórios administrativos**, não avaliações clínicas, indicadores de melhora funcional ou recomendações de exercício. Antes do uso com pessoas reais, ainda são necessárias as revisões de LGPD, segurança, retenção, exportação e impressão de dados pessoais.
 
 ## Turmas, horários e presença
 
