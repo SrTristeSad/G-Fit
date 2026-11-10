@@ -101,6 +101,38 @@ jobs:
             echo "ERROR: second admin bootstrap should be blocked"
             exit 1
           fi
+      - name: Encrypted backup, tamper detection and isolated restore
+        env:
+          POSTGRES_PASSWORD: test_only_not_for_production
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/gfit-ci-backup.key"
+          other_key="$RUNNER_TEMP/gfit-ci-wrong.key"
+          backup="$RUNNER_TEMP/gfit-ci.gfitbak"
+          modified="$RUNNER_TEMP/gfit-ci-tampered.gfitbak"
+          node scripts/generate-backup-key.mjs "$key"
+          if node scripts/generate-backup-key.mjs "$key"; then
+            echo "ERROR: existing backup key was overwritten"
+            exit 1
+          fi
+          node scripts/generate-backup-key.mjs "$other_key"
+          node scripts/backup.mjs "$backup" "$key"
+          test -s "$backup"
+          node scripts/verify-backup.mjs "$backup" "$key"
+          if node scripts/verify-backup.mjs "$backup" "$other_key"; then
+            echo "ERROR: wrong decryption key was accepted"
+            exit 1
+          fi
+          node -e 'const fs=require("node:fs");const b=fs.readFileSync(process.argv[1]);b[40]^=1;fs.writeFileSync(process.argv[2],b);' "$backup" "$modified"
+          if node scripts/verify-backup.mjs "$modified" "$key"; then
+            echo "ERROR: tampered backup passed GCM authentication"
+            exit 1
+          fi
+          node scripts/restore-check.mjs "$backup" "$key"
+          original_count="$(docker compose exec -T db psql -U gfit -d gfit -At -c 'SELECT count(*) FROM teachers' | tr -d '\r\n')"
+          test "$original_count" -ge 2
+          rm -f "$modified" "$backup" "$other_key" "$key"
       - name: Stop test services
         if: always()
         env:
