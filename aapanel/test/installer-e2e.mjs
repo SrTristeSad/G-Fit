@@ -6,9 +6,12 @@ import {setTimeout as pause} from 'node:timers/promises';
 import path from 'node:path';
 import os from 'node:os';
 import {collectReleaseFiles,makeReleaseZip} from '../zip-release.mjs';
+import {createKeyPair} from '../release-trust.mjs';
 
 const base='http://127.0.0.1:3339';
 const privateDir=await fs.mkdtemp(path.join(os.tmpdir(),'gfit-aapanel-e2e-'));
+const signing=createKeyPair();
+await fs.writeFile(path.join(privateDir,'trusted-release-key.pem'),signing.publicPem,{mode:0o600});
 const launcher=spawn(process.execPath,['aapanel/launcher.mjs'],{
   cwd:process.cwd(),
   env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir},
@@ -144,7 +147,7 @@ try{
   let status=await updateStatus();
   assert.equal(status.supported,true);
   assert.equal(status.currentVersion,'0.1.0');
-  const zip=makeReleaseZip(await collectReleaseFiles(process.cwd()),'0.1.1');
+  const zip=makeReleaseZip(await collectReleaseFiles(process.cwd()),'0.1.1',signing.privatePem);
   async function upload(content,pwd='ci-admin-initial-password'){
     const response=await fetch(statusUrl+'/upload',{
       method:'POST',
@@ -158,6 +161,10 @@ try{
   const corrupt=Buffer.from(zip.buffer);
   corrupt[40]^=0x80;
   assert.equal((await upload(corrupt)).status,400);
+  const attackerKey=createKeyPair();
+  const attackerZip=makeReleaseZip(await collectReleaseFiles(process.cwd()),'0.1.1',attackerKey.privatePem);
+  assert.equal((await upload(attackerZip.buffer)).status,400);
+
   const accept=await upload(zip.buffer);
   assert.equal(accept.status,202,JSON.stringify(accept.data));
   assert.equal(accept.data.sha256,zip.sha256);
