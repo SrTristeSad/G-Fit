@@ -34,6 +34,8 @@ if(privateDir===root||privateDir.startsWith(root+path.sep)) {
 const envFile=path.join(privateDir,'instance.env');
 const controlSocket=path.join(privateDir,'update-control.sock');
 const controlToken=randomBytes(32).toString('hex');
+// Opt-in only after configuring Nginx to overwrite X-Real-IP with $remote_addr.
+const trustRealIp=process.env.GFIT_TRUST_REAL_IP==='true';
 let controlServer=null;
 let updateBusy=false;
 let updateInProgress=false;
@@ -347,7 +349,7 @@ function proxyApi(req,res){
   // arbitrary client headers). Accept only a single valid IP; fallback to
   // loopback for SSH tunnels or panels without this trusted proxy setting.
   const realIp=req.headers['x-real-ip'];
-  headers['x-forwarded-for']=typeof realIp==='string'&&isIP(realIp)?realIp:'127.0.0.1';
+  headers['x-forwarded-for']=trustRealIp&&typeof realIp==='string'&&isIP(realIp)?realIp:'127.0.0.1';
   delete headers['x-real-ip'];
   headers['x-forwarded-proto']=req.headers['x-forwarded-proto']==='https'?'https':'http';
   // Same-origin validation for admin ZIP uploads, always derived from the public request.
