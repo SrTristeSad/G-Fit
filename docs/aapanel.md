@@ -85,9 +85,25 @@ O instalador detecta se existe `package-lock.json` em cada projeto. Com lockfile
 
 Para configurar o Pix Sandbox, mantenha as chaves **fora do Git**. O instalador deixa o Asaas desabilitado por padrão. Consulte a documentação do módulo financeiro e faça a homologação antes de qualquer uso real.
 
-### Atualização
+### Atualização pelo painel — arquivo ZIP, sem GitHub
 
-Faça backup do banco **antes** de atualizar, confira as notas da versão, execute `git pull` na pasta do projeto e reinicie o Node.js Project. Alterações no frontend React exigem novo build: `cd web && npm install --include=dev && npm run build`. Alterações em dependências da API podem exigir `cd api && npm install --omit=dev`. As migrações atuais são aditivas e executadas na inicialização da API. **Não apague o arquivo `instance.env` da pasta privada para atualizar**: isso reabre a tela de instalação e não remove dados do PostgreSQL.
+Depois que **esta versão com o atualizador** estiver instalada, as próximas atualizações do G-Fit podem ser feitas **sem executar git pull, sem GitHub e sem terminal na VPS**:
+
+1. Na máquina onde você mantém o código-fonte do G-Fit, prepare uma versão nova e gere um ZIP completo com `npm run release:zip -- --version 0.1.1`. Para cada atualização seguinte, incremente a versão (`0.1.2`, `0.1.3` etc.). O comando salva `releases/gfit-0.1.1.zip`; não inclui `.env`, dados pessoais nem bancos.
+2. Abra o G-Fit no domínio HTTPS e entre com a conta administrativa.
+3. Entre em **Administração → Atualizações** e selecione o ZIP.
+4. Confirme a **senha atual de administrador**, envie o pacote e acompanhe a validação. O servidor verifica caminhos, tamanho, integridade CRC/SHA-256, arquivos obrigatórios, versão superior, extrai em pasta privada, instala dependências em staging e compila o React. A versão em uso continua ativa durante esta preparação.
+5. Confira versão e SHA-256 exibidos na tela. Digite `APLICAR` e confirme a ativação. Antes de trocar o código, o atualizador exige um **backup criptografado do PostgreSQL** via `pg_dump` e uma cópia privada dos arquivos atuais; para isso, o usuário do Node.js deve ter acesso ao cliente PostgreSQL e espaço suficiente no disco.
+6. O supervisor interrompe a API por alguns instantes, ativa os arquivos preparados, inicia a nova API e verifica o endpoint de saúde. Se a ativação falhar, **tenta restaurar automaticamente o código anterior**. Não há restauração automática de dados PostgreSQL: uma migração já executada pode exigir restauração **manual**.
+7. Se a tela indicar ativação concluída, **reinicie o Node.js Project pelo aaPanel** para também carregar qualquer alteração no próprio supervisor. A versão nova permanece registrada em armazenamento privado.
+
+O painel registra histórico de versão, data, SHA-256 e resultado. O pacote preparado permanece na pasta privada da instalação até a ativação ou descarte. A chave e os backups de atualização também ficam fora da pasta pública do site; o operador deve protegê-los e acompanhar o armazenamento.
+
+**Segurança:** o ZIP usa manifesto, CRC e SHA-256 para verificar integridade, mas **não possui assinatura digital de um distribuidor**. Isso significa que um atacante que controle o pacote pode substituí-lo e recalcular os hashes. Instale somente ZIPs que você próprio gerou ou verificou. Atualizações executam código de servidor e não são equivalentes a simplesmente importar dados.
+
+**Pré-requisito:** tenha o executável `pg_dump` acessível no PATH do processo Node do aaPanel, preferencialmente na mesma versão principal do PostgreSQL ou em versão mais recente e compatível. A ativação é bloqueada se o backup do banco não for concluído. Não apague o diretório privado `~/.config/gfit/` ou o banco PostgreSQL ao atualizar.
+
+**Limitações:** os arquivos e dependências do servidor são atualizados; a recuperação de banco e de migrações destrutivas não é automática. Faça um backup operacional independente e teste sua recuperação antes de implantar versões com alterações de banco. Não use este mecanismo ainda para dados sensíveis reais ou instalações comerciais não homologadas. Não existe suporte a pacotes parciais, downgrades, assinatura Ed25519 ou instalação por GitHub remoto.
 
 ### Backups importantes
 
