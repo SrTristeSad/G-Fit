@@ -20,3 +20,8 @@ gfit-backup.key
 
 # Pacotes de atualização gerados localmente (não contém dados pessoais)
 releases/
+
+# Chaves privadas ou públicas de assinatura são provisionadas fora do repositório
+*.pem
+*.p12
+*.pfx
