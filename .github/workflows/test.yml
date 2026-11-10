@@ -10,13 +10,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Resolve pinned dependency lockfiles (CI bootstrap)
-        run: |
-          set -euo pipefail
-          npm --prefix api install --package-lock-only --ignore-scripts --no-audit --no-fund
-          npm --prefix web install --package-lock-only --ignore-scripts --no-audit --no-fund
-          echo "GFIT_LOCK_API_BASE64:$(base64 -w0 api/package-lock.json)"
-          echo "GFIT_LOCK_WEB_BASE64:$(base64 -w0 web/package-lock.json)"
+      - name: Install pinned API dependencies
+        working-directory: api
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: API tests
         working-directory: api
         run: npm test
