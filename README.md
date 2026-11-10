@@ -56,6 +56,8 @@ npm test
 - [x] Exportação JSON por aluno, exclusiva do professor responsável, com fichas, atividades, presenças e avaliações (inclusive correções)
 - [x] Inventário da ficha, histórico de exportações e respostas sensíveis sem cache no navegador
 - [x] Solicitações de exclusão para análise, com origem declarada, triagem administrativa e histórico imutável de status
+- [x] Criação de backups criptografados do PostgreSQL, autenticação de integridade e restauração testada em banco temporário
+- [ ] Agendamento de backup, cópias externas, RPO/RTO definidos e recuperação de desastre homologada
 - [ ] Política de retenção e exclusão definitiva após revisão de necessidade legal e de backups
 - [x] Gráficos de evolução dos registros por mês e versão para impressão, sem interpretação clínica
 - [x] Compatibilidade com exercícios antigos em texto livre, sem apagar os registros de realização
@@ -84,10 +86,27 @@ npm test
 - [x] Central de alertas internos com detecção periódica, reconhecimento e resolução automática de incidentes locais
 - [ ] Pix em produção: homologação real, controles de estorno, monitoramento, reconciliação operacional e contabilidade
 - [x] Troca de senha no painel Minha conta, com revogação das sessões
-- [ ] Recuperação de senha, exclusão/retificação definitiva de dados, backups e auditoria mais ampla
+- [ ] Recuperação de senha, exclusão/retificação definitiva de dados, operação de backups em produção e auditoria mais ampla
 - [ ] Revisão de segurança, LGPD, testes de integração e implantação HTTPS
 
 **Importante:** esta etapa começa com código próprio e ainda **não é uma importação do openGym**. A integração deverá preservar a licença AGPL-3.0 e os avisos de autoria do projeto original. Por enquanto, nenhuma funcionalidade de exercícios do openGym foi transplantada.
+
+## Backups criptografados e recuperação (somente protótipo)
+
+O G-Fit agora inclui **backup manual criptografado AES-256-GCM**, geração de chave separada, verificação de integridade e **restauração em banco temporário** para testes. Os comandos rodam no computador do operador (Node.js 22 e Docker Compose), **não são endpoints disponíveis aos professores ou pelo navegador**.
+
+```powershell
+node scripts/generate-backup-key.mjs ..\gfit-backup.key
+node scripts/backup.mjs backups\gfit-2026-11-09.gfitbak ..\gfit-backup.key
+node scripts/verify-backup.mjs backups\gfit-2026-11-09.gfitbak ..\gfit-backup.key
+node scripts/restore-check.mjs backups\gfit-2026-11-09.gfitbak ..\gfit-backup.key
+```
+
+Substitua a data no nome do arquivo. **Não perca a chave e não a guarde junto ao backup ou no repositório.** O backup se recusa a substituir um arquivo existente; a restauração de teste cria e elimina outro banco no mesmo cluster e **não modifica o banco `gfit`**. O GitHub Actions verifica criptografia, adulteração, chave incorreta e restauração completa com dados fictícios.
+
+**Não há agendamento, armazenamento externo, retenção definida, eliminação definitiva nem recuperação operacional em produção.** Backups antigos podem reintroduzir dados que tenham sido eliminados no futuro; antes de qualquer recuperação real, é necessário conferir decisões de retenção e solicitações de titulares.
+
+Procedimentos completos, riscos e decisões ainda pendentes: **[Backups, recuperação e retenção](docs/backup-recovery.md)**.
 
 ## Licença
 
