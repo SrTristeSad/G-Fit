@@ -2,12 +2,16 @@
 // Requer Node 22. Configure Node.js Project Mapping + SSL no aaPanel antes do formulário.
 import http from 'node:http';
 import {spawn} from 'node:child_process';
-import {randomInt,timingSafeEqual,createHash} from 'node:crypto';
+import {randomInt,timingSafeEqual,createHash,randomBytes} from 'node:crypto';
 import {promises as fs,createReadStream} from 'node:fs';
 import path from 'node:path';
 import {homedir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as pause} from 'node:timers/promises';
+import {
+  stageRelease,activateRelease,discardRelease,updateLocations,
+  writeUpdateState,readJson,
+} from './update-core.mjs';
 import {
   validateSetup,formatEnv,parseEnv,isSecureInstallerRequest,
   installCodeMatches,
@@ -27,6 +31,11 @@ if(privateDir===root||privateDir.startsWith(root+path.sep)) {
   throw new Error('O diretório de segredos deve ficar fora da pasta do site.');
 }
 const envFile=path.join(privateDir,'instance.env');
+const controlSocket=path.join(privateDir,'update-control.sock');
+const controlToken=randomBytes(32).toString('hex');
+let controlServer=null;
+let updateBusy=false;
+let updateInProgress=false;
 const port=Number(process.env.GFIT_PORT||3333);
 const host=process.env.GFIT_HOST||'127.0.0.1';
 if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('Porta inválida.');
@@ -37,6 +46,88 @@ const state={installed:false,running:false,phase:'aguardando',error:null,attempt
 const installCode=String(randomInt(0,100000000)).padStart(8,'0');
 let apiChild=null;
 let closing=false;
+async function stopApi(){
+  const child=apiChild;
+  if(!child||child.exitCode!==null)return;
+  await new Promise(resolve=>{
+    const killTimer=setTimeout(()=>child.kill('SIGKILL'),4500);
+    child.once('exit',()=>{clearTimeout(killTimer);resolve();});
+    child.kill('SIGTERM');
+  });
+  if(apiChild===child)apiChild=null;
+}
+async function startControl(){
+  await fs.mkdir(privateDir,{recursive:true,mode:0o700});
+  await fs.chmod(privateDir,0o700);
+  const prev=await fs.lstat(controlSocket).catch(e=>e.code==='ENOENT'?null:Promise.reject(e));
+  if(prev){
+    if(!prev.isSocket())throw new Error('Caminho do controle de atualizações está ocupado.');
+    await fs.unlink(controlSocket);
+  }
+  controlServer=http.createServer((req,res)=>{
+    void (async()=>{
+      const provided=req.headers['x-gfit-control-token'];
+      if(typeof provided!=='string'||provided.length!==controlToken.length||
+         !timingSafeEqual(Buffer.from(provided),Buffer.from(controlToken))){
+        return respond(res,403,{error:'Controle privado não autorizado.'});
+      }
+      if(req.method!=='POST'||!['/update/prepare','/update/activate','/update/discard'].includes(req.url)){
+        return respond(res,404,{error:'Operação desconhecida.'});
+      }
+      if(updateBusy)return respond(res,409,{error:'Há uma atualização em andamento.'});
+      const input=await readInput(req);
+      const state=await readJson(updateLocations(privateDir).state,null);
+      if(!state||input?.id!==state.id)return respond(res,409,{error:'Pacote pendente não corresponde.'});
+      const action=req.url.slice('/update/'.length);
+      if(action==='prepare'&&!['uploaded','failed_prepare'].includes(state.status)){
+        return respond(res,409,{error:'ZIP não está aguardando preparação.'});
+      }
+      if(action==='activate'&&state.status!=='prepared'){
+        return respond(res,409,{error:'ZIP ainda não foi preparado.'});
+      }
+      updateBusy=true;
+      respond(res,202,{started:true,action});
+      void (async()=>{
+        try{
+          if(action==='prepare'){
+            await stageRelease(privateDir,root);
+          }else if(action==='activate'){
+            updateInProgress=true;
+            const env=parseEnv(await fs.readFile(envFile,'utf8'));
+            try{
+              await activateRelease(privateDir,root,env,{stopApi,startApi});
+            }finally{updateInProgress=false;}
+          }else{
+            await discardRelease(privateDir);
+          }
+        }catch(error){
+          console.error('Atualizador ZIP: '+error.message);
+          if(action==='prepare'){
+            await writeUpdateState(privateDir,{status:'failed_prepare',error:error.message,
+              phase:'Não foi possível preparar o ZIP. Descarte-o ou tente novamente.',progress:0});
+          }else if(action==='activate'){
+            const current=await readJson(updateLocations(privateDir).state,null);
+            if(current?.status==='applying'){
+              await writeUpdateState(privateDir,{status:'prepared',error:error.message,
+                phase:'Ativação interrompida antes da troca ou falhou no backup.',progress:100});
+            }
+          }
+        }finally{updateBusy=false;}
+      })();
+    })().catch(e=>{
+      console.error('Controle ZIP:',e.message);
+      if(!res.headersSent)respond(res,500,{error:'Falha no controle de atualizações.'});
+    });
+  });
+  await new Promise((resolve,reject)=>{
+    controlServer.once('error',reject);
+    controlServer.listen(controlSocket,()=>{
+      controlServer.removeListener('error',reject);
+      resolve();
+    });
+  });
+  await fs.chmod(controlSocket,0o600);
+}
 
 function respond(res,status,data,extra={}){
   const body=JSON.stringify(data);
@@ -117,7 +208,10 @@ async function waitApiReady(child){
 async function startApi(env){
   if(apiChild && apiChild.exitCode===null)return;
   const child=spawn(process.execPath,['src/server.js'],{
-    cwd:apiDir,env:{...process.env,...env},stdio:['ignore','inherit','inherit'],
+    cwd:apiDir,env:{...process.env,...env,
+      GFIT_PRIVATE_DIR:privateDir,GFIT_UPDATE_SOCKET:controlSocket,
+      GFIT_UPDATE_TOKEN:controlToken,
+    },stdio:['ignore','inherit','inherit'],
   });
   apiChild=child;
   child.on('error',e=>console.error('Falha ao iniciar API: '+e.message));
@@ -125,7 +219,7 @@ async function startApi(env){
   catch(error){child.kill();apiChild=null;throw error;}
   child.on('exit',(code)=>{
     apiChild=null;
-    if(!closing){
+    if(!closing&&!updateInProgress){
       console.error('A API parou ('+code+'). Reiniciando o projeto via aaPanel.');
       process.exit(1);
     }
@@ -241,6 +335,7 @@ const mime={
   '.ico':'image/x-icon','.woff2':'font/woff2',
 };
 function proxyApi(req,res){
+  if(updateInProgress)return respond(res,503,{error:'Atualização ZIP em andamento. Aguarde a reinicialização.'});
   const headers={...req.headers,host:'127.0.0.1:3001'};
   // Remove untrusted forwarding headers before handing the request to Express.
   for(const key of ['x-forwarded-for','x-forwarded-host','x-forwarded-proto']){
@@ -249,6 +344,9 @@ function proxyApi(req,res){
   // aaPanel should set this header; do not trust arbitrary chains of proxies.
   headers['x-forwarded-for']='127.0.0.1';
   headers['x-forwarded-proto']=req.headers['x-forwarded-proto']==='https'?'https':'http';
+  // Same-origin validation for admin ZIP uploads, always derived from the public request.
+  headers['x-gfit-public-host']=req.headers.host||'';
+  headers['x-gfit-public-scheme']=headers['x-forwarded-proto'];
   const up=http.request({
     hostname:'127.0.0.1',port:3001,
     path:req.url,method:req.method,headers,
@@ -308,6 +406,7 @@ const server=http.createServer((req,res)=>{
   });
 });
 async function main(){
+  await startControl();
   if(await exists(envFile)){
     // Never auto-start a half-configured project.
     const stats=await fs.stat(envFile);
@@ -336,7 +435,11 @@ for(const signal of ['SIGINT','SIGTERM']){
       watchdog.unref();
       active.once('exit',()=>{
         clearTimeout(watchdog);
-        server.close(()=>process.exit(0));
+        server.close(()=>{
+      controlServer?.close();
+      void fs.rm(controlSocket,{force:true}).catch(()=>{});
+      process.exit(0);
+    });
       });
       active.kill(signal);
     }else{
