@@ -55,6 +55,7 @@ npm test
 - [x] Correções auditáveis, retirada lógica de registros incorretos e comparação numérica de testes equivalentes
 - [x] Exportação JSON por aluno, exclusiva do professor responsável, com fichas, atividades, presenças e avaliações (inclusive correções)
 - [x] Inventário da ficha, histórico de exportações e respostas sensíveis sem cache no navegador
+- [x] Solicitações de exclusão para análise, com origem declarada, triagem administrativa e histórico imutável de status
 - [ ] Política de retenção e exclusão definitiva após revisão de necessidade legal e de backups
 - [x] Gráficos de evolução dos registros por mês e versão para impressão, sem interpretação clínica
 - [x] Compatibilidade com exercícios antigos em texto livre, sem apagar os registros de realização
@@ -91,6 +92,18 @@ npm test
 ## Licença
 
 AGPL-3.0-or-later, conforme o arquivo `LICENSE`. Ao disponibilizar uma versão modificada pela rede, observe as obrigações de disponibilização de código-fonte da AGPL.
+
+## Solicitações de eliminação de dados — triagem, sem exclusão
+
+A seção **Privacidade e exportação** de cada aluno oferece **Registrar pedido para análise**. O professor informa a origem declarada do pedido: aluno, responsável ou iniciativa do professor. O sistema não solicita laudos, documentos nem justificativas de saúde nesse registro. A declaração **não comprova a identidade ou a autorização do titular**.
+
+Um único registro por aluno é mantido para evitar duplicatas, inclusive quando o mesmo pedido chega simultaneamente. O professor acompanha a situação e as mudanças em seu histórico. A administração encontra as solicitações em **Administração → Privacidade**, sem acesso à ficha do aluno ou às suas avaliações: são exibidos apenas identificador interno do aluno, professor responsável, origem declarada, status e datas. O administrador pode mudar a situação para **Em análise** ou **Aguardando política de retenção**. Alterações registram autor, data e estado anterior na tabela `student_erasure_request_events`.
+
+**Nenhuma opção elimina, anonimiza ou modifica os dados pessoais**, e nenhuma etapa marca o pedido como atendido/concluído. A existência de um registro tampouco significa que a identidade do titular foi verificada. A resposta adequada a uma solicitação exige análise de legitimidade, bases legais, exceções de retenção, sistemas auxiliares, cópias exportadas e backups. Esses procedimentos operacionais continuam pendentes e não são simulados pelo produto.
+
+**API:** `GET/POST /api/students/:id/erasure-request` (professor responsável), `GET /api/admin/privacy/requests` e `PATCH /api/admin/privacy/requests/:id` (somente administrador). Não há endpoint de eliminação nem opção para marcar como definitivamente resolvido. As rotas registram apenas metadados do pedido, sem copiar diagnósticos ou conteúdo de fichas, e impedem acesso entre professores. O sistema preserva a solicitação e sua trilha de auditoria.
+
+**Esta implementação não é um canal verificado de exercício de direitos pela LGPD.** Não use o painel como substituto de um processo de atendimento a titulares nem armazene dados de saúde reais nesta versão.
 
 ## Privacidade e portabilidade: exportação por aluno (protótipo)
 
