@@ -203,6 +203,32 @@ try{
   assert.equal(status.currentVersion,'0.1.1');
   assert.equal(status.history[0].version,'0.1.1');
   assert.equal(status.pending.restartRequired,true);
+
+  const backupDir=path.join(privateDir,'updates','snapshots',status.pending.id);
+  const encryptedDb=path.join(backupDir,'database.gfitbak');
+  const backupKey=path.join(privateDir,'updates','db-backup-key.hex');
+  const decryptedDump=path.join(privateDir,'recovery-check.dump');
+  assert.ok((await fs.stat(encryptedDb)).size>64);
+  assert.equal((await fs.stat(backupKey)).mode&0o077,0);
+  const decrypt=spawn(process.execPath,[
+    'scripts/decrypt-update-backup.mjs',encryptedDb,backupKey,decryptedDump,
+  ],{cwd:process.cwd(),stdio:['ignore','pipe','pipe']});
+  let decryptError='';
+  decrypt.stdout.resume();
+  decrypt.stderr.on('data',chunk=>{decryptError+=String(chunk);});
+  const decryptExit=await new Promise((resolve,reject)=>{
+    decrypt.once('error',reject);
+    decrypt.once('exit',resolve);
+  });
+  assert.equal(decryptExit,0,'encrypted PostgreSQL recovery failed: '+decryptError);
+  const handle=await fs.open(decryptedDump,'r');
+  try{
+    const magic=Buffer.alloc(5);
+    await handle.read(magic,0,5,0);
+    assert.equal(magic.toString('ascii'),'PGDMP');
+  }finally{await handle.close();}
+  await fs.rm(decryptedDump,{force:true});
+
   const afterUpdateLogin=await fetch(base+'/api/auth/login',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({email:'admin-install@example.com',password:'ci-admin-initial-password'}),
