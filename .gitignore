@@ -13,3 +13,7 @@ backups/
 *.gfitbak.*.partial
 *.backup.key
 gfit-backup.key
+
+# Instalador aaPanel: NUNCA versionar credenciais ou estados de instalacao
+.aapanel.env
+.aapanel.env.partial
