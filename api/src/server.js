@@ -409,4 +409,5 @@ app.use((error, _req, res, _next) => {
 await initDatabase();
 startAdminAlertScanner();
 const port = Number(process.env.PORT || 3001);
-app.listen(port, '0.0.0.0', () => console.log('G Fit API iniciada na porta', port));
+const bindHost = process.env.BIND_HOST || '0.0.0.0';
+app.listen(port, bindHost, () => console.log('G Fit API iniciada na porta', port));
