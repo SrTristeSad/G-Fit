@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <title>G-Fit | Instalação aaPanel</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;background:#091711;color:#eef9f1}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at 85% -10%,#154d33 0,transparent 39%),radial-gradient(circle at 0 100%,#143122 0,transparent 38%),#091711}
+    .frame{max-width:900px;margin:0 auto;padding:45px 20px 70px}
+    header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:44px}
+    .logo{font-size:24px;font-weight:900;letter-spacing:-.8px;display:flex;align-items:center;gap:10px}
+    .logo>span{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#b0fac6;color:#103d22;font-size:19px}
+    .eyebrow{font-size:11px;color:#b0fac6;text-transform:uppercase;font-weight:750;letter-spacing:2px}
+    h1{font-size:clamp(30px,5vw,51px);letter-spacing:-2px;line-height:1.05;margin:14px 0 16px;max-width:700px}
+    p{line-height:1.55;color:#afc7b5;margin:10px 0}
+    .lead{font-size:16px;max-width:680px;margin-bottom:30px}
+    .pill{border:1px solid #315643;border-radius:100px;padding:7px 13px;color:#cae3d1;font-size:12px;background:#14271d}
+    .panel{background:#11231a;border:1px solid #31513e;border-radius:20px;box-shadow:0 22px 66px #0005;padding:29px;margin-top:22px}
+    h2{font-size:20px;letter-spacing:-.4px;margin:0 0 8px}
+    h3{font-size:14px;margin:26px 0 10px;color:#b5f7c5}
+    label{display:block;font-size:12px;color:#d0e5d4;font-weight:700;margin-top:15px}
+    input{display:block;width:100%;margin-top:7px;background:#0b1d13;border:1px solid #45624c;border-radius:10px;padding:12px 13px;color:#f4fff4;font:inherit;font-size:15px;outline:none}
+    input:focus{border-color:#97edaf;box-shadow:0 0 0 3px #9aefba26}
+    input::placeholder{color:#779487}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 15px}
+    .row{display:grid;grid-template-columns:2fr 1fr;gap:0 15px}
+    button{border:0;border-radius:11px;padding:14px 20px;min-height:49px;font-weight:800;font-size:14px;cursor:pointer;background:#a3f3b5;color:#0d2c17;margin-top:24px}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    button:hover:not(:disabled){background:#c4ffd3}
+    .note{border-left:3px solid #72c990;background:#183726;padding:10px 15px;margin-top:18px;border-radius:0 8px 8px 0;font-size:12px}
+    .note p{margin:0;color:#c0e0c8}
+    .note strong{color:#d8ffdf}
+    .step{display:flex;gap:15px;align-items:center;border-bottom:1px solid #284331;padding:14px 0}
+    .step b{border-radius:50%;width:26px;height:26px;flex:none;display:grid;place-items:center;background:#29523b;color:#d0f7d7;font-size:12px}
+    .step span{font-size:13px}
+    .hidden{display:none!important}
+    .status{padding:13px;border:1px solid #477253;background:#153726;border-radius:10px;color:#b9e5c6;margin-top:15px;white-space:pre-wrap;overflow-wrap:anywhere}
+    .error{background:#411e23;border-color:#ad6e74;color:#ffd0d1}
+    .foot{font-size:12px;margin-top:22px;color:#89a995}
+    .required{color:#b6f6bb}
+    a{color:#abf4bb}
+    @media(max-width:660px){.frame{padding:26px 14px}.grid,.row{grid-template-columns:1fr}.panel{padding:20px}header{margin-bottom:29px}h1{letter-spacing:-1.3px}}
+  </style>
+  <script defer src="/installer.js"></script>
+</head>
+<body>
+  <div class="frame">
+    <header>
+      <div class="logo"><span>G</span> G-Fit</div>
+      <div class="pill">Instalador aaPanel · Node.js 22</div>
+    </header>
+    <div class="eyebrow">Configuração inicial</div>
+    <h1>Seu G-Fit, pronto para configurar.</h1>
+    <p class="lead">Conecte o PostgreSQL, prepare a API e compile a interface React. O código de instalação aparece no log do projeto Node.js no aaPanel. Esse assistente funciona somente na primeira instalação.</p>
+    <div class="step"><b>1</b><span>Instale Node.js 22 e PostgreSQL, crie um banco e um usuário no PostgreSQL com permissões nesse banco.</span></div>
+    <div class="step"><b>2</b><span>No aaPanel, crie um <strong>Node.js Project</strong> apontando para a raiz do G-Fit e use <code>node aapanel/launcher.mjs</code>, porta <strong>3333</strong>, com <strong>Mapping e HTTPS</strong>.</span></div>
+    <div class="step"><b>3</b><span>Preencha os dados e confirme a instalação. O instalador prepara o aplicativo e cria somente o primeiro administrador.</span></div>
+    <section class="panel" id="install-panel">
+      <h2>Configurar instalação</h2>
+      <p>Preencha os dados do PostgreSQL e do administrador. As senhas não são exibidas nos logs de progresso e não são guardadas no navegador.</p>
+      <form id="setup-form" autocomplete="off">
+        <label>Código de instalação <span class="required">*</span>
+          <input id="code" type="password" inputmode="numeric" pattern="[0-9]{8}" minlength="8" maxlength="8" placeholder="8 dígitos no log do aaPanel" required autocomplete="off"/>
+        </label>
+        <h3>Banco de dados PostgreSQL</h3>
+        <div class="row">
+          <label>Servidor do PostgreSQL
+            <input id="dbHost" value="127.0.0.1" maxlength="255" required spellcheck="false"/>
+          </label>
+          <label>Porta
+            <input id="dbPort" type="number" min="1" max="65535" value="5432" required/>
+          </label>
+        </div>
+        <div class="grid">
+          <label>Nome do banco
+            <input id="dbName" value="gfit" maxlength="63" required spellcheck="false"/>
+          </label>
+          <label>Usuário do banco
+            <input id="dbUser" value="gfit" maxlength="63" required spellcheck="false"/>
+          </label>
+        </div>
+        <label>Senha do banco
+          <input id="dbPassword" type="password" maxlength="256" required autocomplete="new-password"/>
+        </label>
+        <h3>Primeiro administrador do G-Fit</h3>
+        <label>E-mail administrativo
+          <input id="adminEmail" type="email" maxlength="254" required autocomplete="email" placeholder="admin@seudominio.com"/>
+        </label>
+        <div class="grid">
+          <label>Senha (10 a 128 caracteres)
+            <input id="adminPassword" type="password" minlength="10" maxlength="128" required autocomplete="new-password"/>
+          </label>
+          <label>Confirmar senha
+            <input id="adminConfirm" type="password" minlength="10" maxlength="128" required autocomplete="new-password"/>
+          </label>
+        </div>
+        <div class="note">
+          <p><strong>Segurança:</strong> use o domínio com certificado HTTPS antes de enviar senhas. O G-Fit permanece em protótipo, com Pix somente no Sandbox; não use dados reais de saúde nem cobranças reais.</p>
+        </div>
+        <button type="submit" id="submit">Instalar G-Fit</button>
+      </form>
+      <div id="message" role="status" aria-live="polite" class="status hidden"></div>
+    </section>
+    <section class="panel hidden" id="progress-panel">
+      <h2>Preparando o G-Fit</h2>
+      <p>O aplicativo está processando as etapas de instalação. Esta página consulta o progresso; a instalação ocorre no processo Node.js do aaPanel.</p>
+      <div id="phase" role="status" aria-live="polite" class="status">Iniciando…</div>
+      <p class="foot">Não divulgue o código de instalação. Em caso de erro, consulte também os logs do projeto Node.js no aaPanel.</p>
+      <button type="button" id="retry" class="hidden">Revisar dados e tentar novamente</button>
+      <a id="open-app" href="/" class="hidden">Abrir G-Fit →</a>
+    </section>
+    <p class="foot">G-Fit · Instalação para aaPanel · Open Source · Dados armazenados no PostgreSQL configurado</p>
+  </div>
+</body>
+</html>
