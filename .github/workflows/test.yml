@@ -10,13 +10,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Resolve pinned dependency lockfiles (CI bootstrap)
+        run: |
+          set -euo pipefail
+          npm --prefix api install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm --prefix web install --package-lock-only --ignore-scripts --no-audit --no-fund
+          echo "GFIT_LOCK_API_BASE64:$(base64 -w0 api/package-lock.json)"
+          echo "GFIT_LOCK_WEB_BASE64:$(base64 -w0 web/package-lock.json)"
       - name: API tests
         working-directory: api
         run: npm test
       - name: Build web
         working-directory: web
         run: |
-          npm install --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           npm run build
       - name: Validate Docker Compose
         env:
@@ -136,7 +143,8 @@ jobs:
       - name: aaPanel installer and offline ZIP package security tests
         run: |
           npm test
-          npm run release:zip -- --version 0.1.1
+          node scripts/generate-release-keys.mjs "$RUNNER_TEMP/ci-release-private.pem" "$RUNNER_TEMP/ci-release-public.pem"
+          npm run release:zip -- --version 0.1.1 --key "$RUNNER_TEMP/ci-release-private.pem"
           test -s releases/gfit-0.1.1.zip
       - name: aaPanel full installation with disposable PostgreSQL
         run: |
