@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
+import StudentErasureRequest from './StudentErasureRequest.jsx';
 
 const sections = {
   exercises:'Atividades atribuídas',
@@ -129,6 +130,7 @@ export default function StudentPrivacy({ id }) {
             Retenção automática e exclusão definitiva ainda não estão disponíveis.
             Arquivar a ficha ou retirar uma avaliação da lista não apaga os dados do banco.
           </p>
+          <StudentErasureRequest id={id} />
         </>
       )}
     </section>
