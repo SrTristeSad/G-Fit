@@ -14,6 +14,7 @@ import { registerClassRoutes } from './classes.js';
 import { registerReportRoutes } from './reports.js';
 import { registerAssessmentRoutes } from './assessments.js';
 import { registerStudentPrivacyRoutes } from './student-privacy.js';
+import { registerErasureRequestRoutes } from './erasure-requests.js';
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -250,6 +251,7 @@ registerClassRoutes(app, requireTeacher, requireAccessForNewActivity);
 registerReportRoutes(app, requireTeacher);
 registerAssessmentRoutes(app, requireTeacher, requireAccessForNewActivity);
 registerStudentPrivacyRoutes(app, requireTeacher, rateLimit);
+registerErasureRequestRoutes(app, requireTeacher, requireAdmin, rateLimit);
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
