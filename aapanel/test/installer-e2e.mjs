@@ -93,6 +93,24 @@ try{
   const me=await login.json();
   assert.equal(me.teacher.isAdmin,true);
   assert.ok(login.headers.get('set-cookie')?.includes('Secure'));
+  // Nginx overwrites X-Real-IP. Authentication limits must be per client,
+  // not shared by every browser behind 127.0.0.1:3333.
+  let rateLimited=false;
+  for(let i=0;i<12;i++){
+    const probe=await fetch(base+'/api/auth/login',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Real-IP':'192.0.2.11'},
+      body:JSON.stringify({email:'nobody@example.invalid',password:'incorrect-password'}),
+    });
+    if(probe.status===429){rateLimited=true;break;}
+  }
+  assert.equal(rateLimited,true,'per-client auth limit should be enforced');
+  const independent=await fetch(base+'/api/auth/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Real-IP':'192.0.2.12'},
+    body:JSON.stringify({email:'admin-install@example.com',password:'ci-admin-initial-password'}),
+  });
+  assert.equal(independent.status,200,'different client IP should have its own rate limit');
 
   const config=await fs.readFile(path.join(privateDir,'instance.env'),'utf8');
   assert.ok(config.includes('BIND_HOST="127.0.0.1"'));
