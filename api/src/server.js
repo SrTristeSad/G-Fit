@@ -256,7 +256,7 @@ registerErasureRequestRoutes(app, requireTeacher, requireAdmin, rateLimit);
 // O contêiner Docker copia apenas api/: o atualizador roda exclusivamente no aaPanel.
 if (process.env.GFIT_UPDATE_SOCKET) {
   const {registerZipUpdateRoutes}=await import('../../aapanel/update-routes.mjs');
-  registerZipUpdateRoutes(app, requireTeacher, requireAdmin, rateLimit);
+  registerZipUpdateRoutes(app, requireTeacher, requireAdmin, rateLimit, express);
 } else {
   app.get('/api/admin/system/update',requireTeacher,requireAdmin,(_req,res)=>
     res.json({supported:false,mode:'docker',
