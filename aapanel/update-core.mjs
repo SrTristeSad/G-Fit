@@ -259,6 +259,58 @@ export async function activateRelease(privateDir,root,env,{stopApi,startApi}){
     throw error;
   }
 }
+// Executado antes de abrir o app em um novo processo aaPanel.
+// Se um processo anterior morreu preparando, libera o estado para nova tentativa.
+// Se morreu aplicando e o snapshot de código está íntegro, recupera a versão
+// anterior; NUNCA restaura o banco automaticamente.
+export async function recoverInterruptedUpdate(privateDir,root){
+  const loc=updateLocations(privateDir);
+  const state=await readJson(loc.state,null);
+  if(!state||!['preparing','applying'].includes(state.status))return false;
+  if(state.status==='preparing'){
+    await writeUpdateState(privateDir,{
+      status:'failed_prepare',phase:'Preparação interrompida por reinício do processo',
+      error:'O processo parou durante a preparação. Tente novamente ou descarte o pacote.',
+      progress:0,
+    });
+    return true;
+  }
+  const activated=await readJson(loc.current,null);
+  if(activated?.version===state.version && activated?.sha256===state.sha256){
+    await writeUpdateState(privateDir,{
+      status:'applied',progress:100,restartRequired:false,
+      phase:'Atualização aplicada antes do reinício do processo.',
+      error:null,
+    });
+    return true;
+  }
+  const snapshot=path.join(loc.snapshots,state.id,'code');
+  if(await has(path.join(snapshot,'contents.json'))){
+    try{
+      await restoreCodeSnapshot(root,snapshot);
+      await writeUpdateState(privateDir,{
+        status:'failed',phase:'Processo interrompido; código anterior restaurado na inicialização',
+        error:'A base de dados não foi revertida. Verifique as migrações e o backup antes de continuar.',
+        backupLocation:path.join(loc.snapshots,state.id),
+        restartRequired:false,
+      });
+      await appendHistory(privateDir,{
+        id:state.id,version:state.version,sha256:state.sha256,
+        status:'failed',date:new Date().toISOString(),
+      });
+      return true;
+    }catch(error){
+      console.error('CRÍTICO: não foi possível recuperar código interrompido:',error.message);
+    }
+  }
+  await writeUpdateState(privateDir,{
+    status:'failed',phase:'Intervenção manual necessária: atualização interrompida',
+    error:'Não foi possível confirmar ou restaurar automaticamente a versão anterior. Consulte os backups.',
+    restartRequired:false,
+  });
+  return true;
+}
+
 export async function discardRelease(privateDir){
   const loc=updateLocations(privateDir);
   const state=await readJson(loc.state,null);
