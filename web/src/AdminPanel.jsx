@@ -5,6 +5,7 @@ import AccessPanel from './AccessPanel.jsx';
 import BillingPanel from './BillingPanel.jsx';
 import BillingOperations from './BillingOperations.jsx';
 import AdminAlerts from './AdminAlerts.jsx';
+import PrivacyRequestsAdmin from './PrivacyRequestsAdmin.jsx';
 
 function Stat({ label, value, caption }) {
   return (
@@ -276,6 +277,9 @@ export default function AdminPanel() {
         <button className={view === 'alerts' ? 'active' : ''} onClick={() => setView('alerts')}>
           Alertas{alertsSummary.open > 0 ? ' (' + alertsSummary.open + ')' : ''}
         </button>
+        <button className={view === 'privacy' ? 'active' : ''} onClick={() => setView('privacy')}>
+          Privacidade
+        </button>
         <button className={view === 'audit' ? 'active' : ''} onClick={() => setView('audit')}>
           Histórico
         </button>
@@ -360,6 +364,7 @@ export default function AdminPanel() {
       {view === 'billing' && <BillingPanel admin teachers={teachers} />}
       {view === 'operations' && <BillingOperations />}
       {view === 'alerts' && <AdminAlerts onChanged={reload} />}
+      {view === 'privacy' && <PrivacyRequestsAdmin />}
       {view === 'audit' && (
         <div className="card">
           <h2>Histórico de alterações</h2>
