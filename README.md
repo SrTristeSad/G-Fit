@@ -11,6 +11,16 @@ Plataforma para profissionais de educação física organizarem alunos, turmas e
 - **Banco:** PostgreSQL
 - **Desenvolvimento local:** Docker Compose
 
+## Instalação pelo aaPanel (Node.js, sem Docker)
+
+O G-Fit agora tem um **instalador visual** para aaPanel, no mesmo estilo dos projetos Node.js: abra o domínio HTTPS mapeado, digite o **código exibido no log do Node.js Project**, configure PostgreSQL e defina a primeira conta administrativa. Ele instala as dependências, compila React, aplica as migrações e inicia a API. Após a instalação, a mesma aplicação serve o React e a API; não é necessário publicar portas internas.
+
+**Node.js Project:** use **Node 22**, diretório da raiz do repositório, comando **`node aapanel/launcher.mjs`**, porta **3333**, usuário **www**, Mapping de domínio e SSL habilitados. O PostgreSQL precisa estar instalado e o banco/usuário devem ser criados com antecedência. O instalador usa `npm ci` quando existe lockfile, ou `npm install` quando não existe, evitando a falha anterior sem `package-lock.json`.
+
+**[Guia completo de instalação no aaPanel](docs/aapanel.md)** — inclui instruções de banco, configuração segura do proxy, atualização e solução de erros.
+
+O modo **Docker Compose** abaixo continua disponível como alternativa independente. Não instale Docker e aaPanel sobre o mesmo banco/domínio sem planejar a migração.
+
 ## Começar
 
 1. Copie `.env.example` para `.env` e altere a senha do banco.
@@ -40,6 +50,7 @@ npm test
 ## Estado do produto
 
 - [x] API Node.js e interface React inicial
+- [x] Instalador visual de uso único no aaPanel, com Node.js 22, PostgreSQL configurável e administrador inicial
 - [x] Cadastro, login e logout de professores
 - [x] Cadastro e listagem de alunos associados ao professor autenticado
 - [x] Ficha do aluno: nome preferido, nascimento, contato, contato de emergência, objetivos e observações gerais
