@@ -255,12 +255,12 @@ async function serveApp(req,res,url){
   if(url.pathname==='/api'||url.pathname.startsWith('/api/')){
     proxyApi(req,res);return;
   }
-  if(req.method!=='GET'&&req.method!=='HEAD'){
-    return respond(res,405,{error:'Método não permitido.'});
-  }
   if(url.pathname.startsWith('/setup')||url.pathname.startsWith('/installer')||
     url.pathname.startsWith('/.')){
     return respond(res,404,{error:'Página não encontrada.'});
+  }
+  if(req.method!=='GET'&&req.method!=='HEAD'){
+    return respond(res,405,{error:'Método não permitido.'});
   }
   const basename=decodeURIComponent(url.pathname);
   const resolved=path.resolve(distDir,'.'+basename);
