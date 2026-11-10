@@ -185,10 +185,10 @@ async function exec(command,args,cwd,env=process.env){
   }
 }
 async function installDependencies(folder,includeDev){
-  const lock=await exists(path.join(folder,'package-lock.json'));
-  // npm ci requer um package-lock válido; projetos sem lock usam npm install.
-  const mode=lock?'ci':'install';
-  await exec('npm',[mode,includeDev?'--include=dev':'--omit=dev',
+  if(!await exists(path.join(folder,'package-lock.json'))){
+    throw new Error('package-lock.json ausente em '+path.basename(folder)+'. Instale somente pacotes completos e versionados.');
+  }
+  await exec('npm',['ci','--ignore-scripts',includeDev?'--include=dev':'--omit=dev',
     '--no-audit','--no-fund'],folder);
 }
 async function waitApiReady(child){
