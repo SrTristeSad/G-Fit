@@ -133,8 +133,11 @@ jobs:
           original_count="$(docker compose exec -T db psql -U gfit -d gfit -At -c 'SELECT count(*) FROM teachers' | tr -d '\r\n')"
           test "$original_count" -ge 2
           rm -f "$modified" "$backup" "$other_key" "$key"
-      - name: aaPanel installer unit tests
-        run: node --test aapanel/test/setup-utils.test.mjs
+      - name: aaPanel installer and offline ZIP package security tests
+        run: |
+          npm test
+          npm run release:zip -- --version 0.1.1
+          test -s releases/gfit-0.1.1.zip
       - name: aaPanel full installation with disposable PostgreSQL
         run: |
           set -euo pipefail
