@@ -63,7 +63,7 @@ export default function SystemUpdates(){
       setError('O ZIP excede 32 MiB.');return;
     }
     if(!window.confirm(
-      'O ZIP executará código com os privilégios do aplicativo. Verifique a origem do pacote antes de continuar.',
+      'O ZIP assinado será verificado antes da preparação. Verifique se a chave pública confiável está correta antes de continuar.',
     ))return;
     setBusy(true);setError('');setSuccess('');
     try{
@@ -105,10 +105,10 @@ export default function SystemUpdates(){
         Selecione um ZIP de release, valide e prepare o pacote, depois confirme a ativação.
       </p>
       <p className="notice">
-        <strong>Atenção:</strong> o arquivo não possui assinatura digital de um distribuidor.
-        CRC e SHA-256 detectam alterações acidentais, mas não provam que a origem é confiável.
-        Instale apenas pacotes gerados e revisados por você. Não envie dados de alunos, chaves ou
-        arquivos de banco dentro do ZIP.
+        <strong>Assinatura obrigatória:</strong> o ZIP precisa ser assinado com a chave privada
+        Ed25519 do responsável, e a chave pública precisa estar instalada na VPS fora do site.
+        Um pacote não assinado ou assinado por outra chave será recusado antes da preparação.
+        Nunca envie chaves privadas, dados de alunos ou backups dentro do ZIP.
       </p>
       {transient&&<p className="notice" role="status">
         A API está temporariamente indisponível. Se a atualização estiver em andamento,
@@ -124,19 +124,27 @@ export default function SystemUpdates(){
             <div><small>Versão instalada</small><strong>{data.currentVersion}</strong></div>
             <div><small>Método de atualização</small><strong>ZIP local</strong></div>
           </div>
+          {!data.signingConfigured&&<p className="notice" role="alert">
+            <strong>Atualização bloqueada:</strong> falta instalar a chave pública de assinatura
+            confiável no servidor. Configure-a uma única vez no aaPanel antes de enviar ZIPs.
+            Consulte o manual de instalação e atualização.
+          </p>}
+          {data.signingConfigured&&<p className="muted">
+            Chave confiável Ed25519: <code className="update-sha">{data.signingFingerprint}</code>
+          </p>}
           <label>Senha atual do administrador (exigida para cada operação)
             <input type="password" autoComplete="off" value={password}
               onChange={e=>setPassword(e.target.value)} minLength={10} maxLength={128}
               placeholder="Confirme sua senha antes de enviar ou aplicar"/>
           </label>
-          {!pending||['failed','applied'].includes(pending.status)?(
+          {data.signingConfigured&&(!pending||['failed','applied'].includes(pending.status))?(
             <form onSubmit={upload} className="stack update-upload-form">
               <label>Arquivo ZIP de atualização
                 <input ref={uploader} type="file" accept=".zip,application/zip" required
                   onChange={e=>setFile(e.target.files?.[0]||null)}/>
               </label>
               <small className="muted">Tamanho máximo: 32 MiB. Envie o ZIP completo criado por
-                <code> npm run release:zip -- --version X.Y.Z</code>.
+                <code> npm run release:zip -- --version X.Y.Z --key /caminho/chave-privada.pem</code>.
               </small>
               <button type="submit" className="primary" disabled={busy||!file}>
                 {busy?'Enviando…':'Enviar ZIP e preparar versão'}
