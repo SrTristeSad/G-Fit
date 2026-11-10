@@ -1,0 +1,325 @@
+// G-Fit aaPanel: instalador de navegador de uso único + frontend/API no mesmo projeto Node.
+// Requer Node 22. Configure Node.js Project Mapping + SSL no aaPanel antes do formulário.
+import http from 'node:http';
+import {spawn} from 'node:child_process';
+import {randomInt,timingSafeEqual} from 'node:crypto';
+import {promises as fs,createReadStream} from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {setTimeout as pause} from 'node:timers/promises';
+import {
+  validateSetup,formatEnv,parseEnv,isSecureInstallerRequest,
+  installCodeMatches,
+} from './setup-utils.mjs';
+
+const here=path.dirname(fileURLToPath(import.meta.url));
+const root=path.resolve(here,'..');
+const apiDir=path.join(root,'api');
+const webDir=path.join(root,'web');
+const distDir=path.join(webDir,'dist');
+const envFile=path.join(root,'.aapanel.env');
+const port=Number(process.env.GFIT_PORT||3333);
+const host=process.env.GFIT_HOST||'127.0.0.1';
+if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('Porta inválida.');
+if(host!=='127.0.0.1' && host!=='::1'){
+  throw new Error('Por segurança, o instalador deve usar GFIT_HOST=127.0.0.1 ou ::1.');
+}
+const state={installed:false,running:false,phase:'aguardando',error:null,attempts:0,lockedUntil:0};
+const installCode=String(randomInt(0,100000000)).padStart(8,'0');
+let apiChild=null;
+let closing=false;
+
+function respond(res,status,data,extra={}){
+  const body=JSON.stringify(data);
+  res.writeHead(status,{
+    'Content-Type':'application/json; charset=utf-8',
+    'Cache-Control':'no-store, max-age=0',
+    'X-Content-Type-Options':'nosniff',
+    'Content-Length':Buffer.byteLength(body),
+    ...extra,
+  });
+  res.end(body);
+}
+function isAllowedOrigin(req){
+  const origin=req.headers.origin;
+  if(!origin)return true;
+  try{
+    const parsed=new URL(origin);
+    const hostHeader=req.headers.host;
+    if(parsed.host!==hostHeader)return false;
+    const expected=req.headers['x-forwarded-proto']==='https'?'https:':'http:';
+    return parsed.protocol===expected;
+  }catch{return false;}
+}
+async function readInput(req){
+  let bytes=0;
+  const parts=[];
+  for await(const chunk of req){
+    bytes+=chunk.length;
+    if(bytes>16384)throw new Error('Requisição muito grande.');
+    parts.push(chunk);
+  }
+  return JSON.parse(Buffer.concat(parts).toString('utf8'));
+}
+async function exists(filename){
+  try{await fs.access(filename);return true;}
+  catch(error){if(error.code==='ENOENT')return false;throw error;}
+}
+async function exec(command,args,cwd,env=process.env){
+  const child=spawn(command,args,{cwd,env,stdio:['ignore','pipe','pipe'],windowsHide:true});
+  let errorOutput='';
+  child.stderr.on('data',part=>{errorOutput=(errorOutput+String(part)).slice(-1000);});
+  // Draining stdout prevents hung npm/Node subprocesses; never copy secrets to UI.
+  child.stdout.resume();
+  const exit=await new Promise((resolve,reject)=>{
+    child.once('error',reject);
+    child.once('exit',code=>resolve(code));
+  });
+  if(exit!==0){
+    const hint=command==='npm'?
+      'Verifique a versão Node, npm, permissões e conexão de rede no log do aaPanel.':
+      'Verifique as credenciais do PostgreSQL e o log do processo no aaPanel.';
+    console.error('Erro em '+command+' ('+exit+'): '+errorOutput.slice(-600));
+    throw new Error('Falha ao executar '+command+' (código '+exit+'). '+hint);
+  }
+}
+async function installDependencies(folder,includeDev){
+  const lock=await exists(path.join(folder,'package-lock.json'));
+  // npm ci requer um package-lock válido; projetos sem lock usam npm install.
+  const mode=lock?'ci':'install';
+  await exec('npm',[mode,includeDev?'--include=dev':'--omit=dev',
+    '--no-audit','--no-fund'],folder);
+}
+async function waitApiReady(child){
+  for(let i=0;i<80;i++){
+    if(child.exitCode!==null||child.signalCode!==null){
+      throw new Error('A API encerrou antes de ficar pronta.');
+    }
+    try{
+      const response=await fetch('http://127.0.0.1:3001/api/health',{
+        signal:AbortSignal.timeout(700),
+      });
+      if(response.ok)return;
+    }catch{}
+    await pause(250);
+  }
+  throw new Error('A API não ficou disponível na porta 3001.');
+}
+async function startApi(env){
+  if(apiChild && apiChild.exitCode===null)return;
+  const child=spawn(process.execPath,['src/server.js'],{
+    cwd:apiDir,env:{...process.env,...env},stdio:['ignore','inherit','inherit'],
+  });
+  apiChild=child;
+  child.on('error',e=>console.error('Falha ao iniciar API: '+e.message));
+  try{await waitApiReady(child);}
+  catch(error){child.kill();apiChild=null;throw error;}
+  child.on('exit',(code)=>{
+    apiChild=null;
+    if(!closing){
+      console.error('A API parou ('+code+'). Reiniciando o projeto via aaPanel.');
+      process.exit(1);
+    }
+  });
+}
+async function install(input){
+  state.phase='Instalando dependências da API';
+  await installDependencies(apiDir,false);
+  state.phase='Instalando dependências do React';
+  await installDependencies(webDir,true);
+  state.phase='Compilando interface React';
+  await exec('npm',['run','build'],webDir);
+  const env={};
+  for(const key of ['DB_HOST','DB_PORT','DB_USER','DB_NAME','DB_PASSWORD']){
+    env[key]=input[key];
+  }
+  Object.assign(env,{
+    NODE_ENV:'production',COOKIE_SECURE:'true',
+    PORT:'3001',BIND_HOST:'127.0.0.1',
+    GFIT_SETUP_ADMIN_EMAIL:input.adminEmail,
+    GFIT_SETUP_ADMIN_PASSWORD:input.adminPassword,
+  });
+  state.phase='Validando PostgreSQL e criando administrador';
+  await exec(process.execPath,[path.join(here,'provision.mjs')],root,{
+    ...process.env,...env,
+  });
+  delete env.GFIT_SETUP_ADMIN_EMAIL;
+  delete env.GFIT_SETUP_ADMIN_PASSWORD;
+  state.phase='Iniciando API';
+  await startApi(env);
+  state.phase='Salvando configuração privada';
+  // Gravado somente após validação de credenciais, banco, frontend e API.
+  const temp=envFile+'.partial';
+  await fs.writeFile(temp,formatEnv(env),{flag:'wx',mode:0o600});
+  try{
+    if(await exists(envFile))throw new Error('Instalação já concluída.');
+    await fs.rename(temp,envFile);
+  }finally{await fs.rm(temp,{force:true}).catch(()=>{});}
+  state.installed=true;
+  state.phase='Concluído';
+  state.error=null;
+}
+async function setupHandler(req,res,url){
+  if(req.method==='GET' && (url.pathname==='/'||url.pathname==='/setup')){
+    res.writeHead(200,{
+      'Content-Type':'text/html; charset=utf-8',
+      'Cache-Control':'no-store, max-age=0',
+      'Content-Security-Policy':"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'",
+      'X-Content-Type-Options':'nosniff',
+      'X-Frame-Options':'DENY',
+    });
+    createReadStream(path.join(here,'installer.html')).pipe(res);
+    return;
+  }
+  if(req.method==='GET' && url.pathname==='/installer.js'){
+    res.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store'});
+    createReadStream(path.join(here,'installer.js')).pipe(res);
+    return;
+  }
+  if(req.method!=='POST'||!['/setup/status','/setup/install'].includes(url.pathname)){
+    return respond(res,404,{error:'Página não encontrada.'});
+  }
+  if(!isSecureInstallerRequest(req)){
+    return respond(res,403,{error:'Abra o instalador por HTTPS via domínio aaPanel, ou pelo túnel localhost.'});
+  }
+  if(!isAllowedOrigin(req)){
+    return respond(res,403,{error:'Origem não autorizada.'});
+  }
+  if(Date.now()<state.lockedUntil){
+    return respond(res,429,{error:'Código bloqueado temporariamente. Consulte o log do aaPanel.'});
+  }
+  let input;
+  try{input=await readInput(req);}
+  catch{return respond(res,400,{error:'Dados do formulário inválidos.'});}
+  if(!installCodeMatches(input.code,installCode,timingSafeEqual)){
+    state.attempts++;
+    if(state.attempts>=5) {
+      state.lockedUntil=Date.now()+15*60*1000;state.attempts=0;
+    }
+    return respond(res,403,{error:'Código de instalação incorreto.'});
+  }
+  state.attempts=0;
+  if(url.pathname==='/setup/status'){
+    return respond(res,200,{
+      installed:state.installed,running:state.running,
+      phase:state.phase,error:state.error,
+    });
+  }
+  if(state.running)return respond(res,409,{error:'Instalação já em andamento.'});
+  if(state.installed||await exists(envFile))return respond(res,409,{error:'Já instalado.'});
+  const valid=validateSetup(input);
+  if(!valid)return respond(res,400,{
+    error:'Confira host, porta, nome/usuário do banco, senha e credenciais do administrador.',
+  });
+  state.running=true;
+  state.error=null;
+  state.phase='Preparando instalação';
+  respond(res,202,{started:true});
+  // A aplicação aaPanel permanece viva enquanto instala; status é consultável.
+  void install(valid).catch(err=>{
+    state.error=err.message;
+    state.phase='Falha — confira os dados e tente novamente';
+    console.error('Instalador G-Fit: '+err.message);
+  }).finally(()=>{state.running=false;});
+}
+const mime={
+  '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',
+  '.css':'text/css; charset=utf-8','.svg':'image/svg+xml',
+  '.json':'application/json; charset=utf-8','.png':'image/png',
+  '.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp',
+  '.ico':'image/x-icon','.woff2':'font/woff2',
+};
+function proxyApi(req,res){
+  const headers={...req.headers,host:'127.0.0.1:3001'};
+  // Remove untrusted forwarding headers before handing the request to Express.
+  for(const key of ['x-forwarded-for','x-forwarded-host','x-forwarded-proto']){
+    delete headers[key];
+  }
+  // aaPanel should set this header; do not trust arbitrary chains of proxies.
+  headers['x-forwarded-for']='127.0.0.1';
+  headers['x-forwarded-proto']=req.headers['x-forwarded-proto']==='https'?'https':'http';
+  const up=http.request({
+    hostname:'127.0.0.1',port:3001,
+    path:req.url,method:req.method,headers,
+  },upRes=>{
+    res.writeHead(upRes.statusCode||502,upRes.headers);
+    upRes.pipe(res);
+  });
+  up.on('error',()=>{
+    if(!res.headersSent)respond(res,502,{error:'API indisponível.'});
+    else res.destroy();
+  });
+  req.pipe(up);
+}
+async function serveApp(req,res,url){
+  if(url.pathname==='/api'||url.pathname.startsWith('/api/')){
+    proxyApi(req,res);return;
+  }
+  if(req.method!=='GET'&&req.method!=='HEAD'){
+    return respond(res,405,{error:'Método não permitido.'});
+  }
+  if(url.pathname.startsWith('/setup')||url.pathname.startsWith('/installer')||
+    url.pathname.startsWith('/.')){
+    return respond(res,404,{error:'Página não encontrada.'});
+  }
+  const basename=decodeURIComponent(url.pathname);
+  const resolved=path.resolve(distDir,'.'+basename);
+  if(resolved!==distDir&&!resolved.startsWith(distDir+path.sep)){
+    return respond(res,404,{error:'Página não encontrada.'});
+  }
+  let target=resolved;
+  let stat=await fs.stat(target).catch(()=>null);
+  if(!stat||!stat.isFile()){
+    if(path.extname(basename))return respond(res,404,{error:'Arquivo não encontrado.'});
+    target=path.join(distDir,'index.html');
+    stat=await fs.stat(target).catch(()=>null);
+  }
+  if(!stat||!stat.isFile())return respond(res,503,{error:'Interface indisponível.'});
+  const isAsset=target.includes(path.sep+'assets'+path.sep);
+  res.writeHead(200,{
+    'Content-Type':mime[path.extname(target)]||'application/octet-stream',
+    'Cache-Control':isAsset?'public, max-age=31536000, immutable':'no-store',
+    'X-Content-Type-Options':'nosniff',
+    'Content-Length':stat.size,
+  });
+  if(req.method==='HEAD')return res.end();
+  createReadStream(target).pipe(res);
+}
+const server=http.createServer((req,res)=>{
+  void (async()=>{
+    const url=new URL(req.url,'http://localhost');
+    if(!state.installed)return setupHandler(req,res,url);
+    return serveApp(req,res,url);
+  })().catch(error=>{
+    console.error('Falha na requisição: '+error.message);
+    if(!res.headersSent)respond(res,500,{error:'Erro interno do servidor.'});
+    else res.destroy();
+  });
+});
+async function main(){
+  if(await exists(envFile)){
+    // Never auto-start a half-configured project.
+    const stats=await fs.stat(envFile);
+    if(process.platform!=='win32' && (stats.mode & 0o077)!==0){
+      throw new Error('Permissões inseguras em .aapanel.env: use chmod 600.');
+    }
+    const env=parseEnv(await fs.readFile(envFile,'utf8'));
+    await startApi(env);
+    state.installed=true;
+    state.phase='Aplicação pronta';
+    console.log('G-Fit aaPanel iniciado; frontend e API no endereço da porta '+port);
+  }else{
+    console.log('G-Fit ainda não está configurado.');
+    console.log('CÓDIGO DE INSTALAÇÃO: '+installCode);
+    console.log('Abra o domínio HTTPS mapeado no aaPanel ou use túnel SSH local.');
+  }
+  server.listen(port,host,()=>console.log('G-Fit aaPanel ouvindo em '+host+':'+port));
+}
+for(const signal of ['SIGINT','SIGTERM']){
+  process.on(signal,()=>{
+    closing=true;
+    if(apiChild)apiChild.kill(signal);
+    server.close(()=>process.exit(0));
+  });
+}
+await main();
