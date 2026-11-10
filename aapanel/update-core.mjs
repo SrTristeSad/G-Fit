@@ -171,6 +171,19 @@ async function installStage(root,staging){
 }
 async function restoreCodeSnapshot(root,destination){
   const {available}=await readJson(path.join(destination,'contents.json'),{available:[]});
+  // Never remove live files unless ALL critical snapshot entries are present.
+  // A truncated backup is an operator incident, not a reason to wipe the app.
+  const essential=['package.json','api/package.json','api/src','web/package.json',
+    'web/src','web/dist','aapanel'];
+  if(!Array.isArray(available)||!essential.every(name=>available.includes(name))||
+     available.some(name=>!tracked.includes(name))) {
+    throw new Error('Snapshot anterior incompleto. Não será alterado nenhum arquivo.');
+  }
+  for(const name of available){
+    if(!await has(path.join(destination,name))){
+      throw new Error('Snapshot ausente: '+name+'. O código atual foi preservado.');
+    }
+  }
   for(const name of tracked){
     await fs.rm(path.join(root,name),{recursive:true,force:true});
     if(available.includes(name))await copyPath(path.join(destination,name),path.join(root,name));
