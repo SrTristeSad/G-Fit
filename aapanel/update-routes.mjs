@@ -12,6 +12,7 @@ import {
   currentVersion,readJson,discardRelease,
 } from './update-core.mjs';
 import {validateRelease,ZIP_MAX_BYTES} from './zip-release.mjs';
+import {readTrustedKey,fingerprint} from './release-trust.mjs';
 
 const location=process.env.GFIT_PRIVATE_DIR;
 const available=!!(location&&process.env.GFIT_UPDATE_SOCKET&&process.env.GFIT_UPDATE_TOKEN);
@@ -84,7 +85,16 @@ export function registerZipUpdateRoutes(app,requireTeacher,requireAdmin,rateLimi
   const base='/api/admin/system/update';
   app.get(base,requireTeacher,requireAdmin,async(_req,res)=>{
     if(!available)return res.json({supported:false,mode:'docker',message:'ZIP updater só funciona no aaPanel.'});
-    res.json(await readUpdateStatus(privateDirectory,path.resolve('..')));
+    const result=await readUpdateStatus(privateDirectory,path.resolve('..'));
+    try{
+      result.signingConfigured=true;
+      result.signingFingerprint=fingerprint(await readTrustedKey(privateDirectory));
+    }catch{
+      result.signingConfigured=false;
+      result.signingFingerprint=null;
+      result.signingMessage='Instale a chave pública de assinatura fora do site antes de enviar ZIPs.';
+    }
+    res.json(result);
   });
   app.post(base+'/upload',requireTeacher,requireAdmin,limited,passwordGuard,
     express.raw({type:'application/zip',limit:ZIP_MAX_BYTES}),async(req,res)=>{
@@ -99,7 +109,10 @@ export function registerZipUpdateRoutes(app,requireTeacher,requireAdmin,rateLimi
       }
       const version=await currentVersion(privateDirectory,root);
       let release;
-      try{release=validateRelease(req.body,version);}
+      let key;
+      try{key=await readTrustedKey(privateDirectory);}
+      catch{return res.status(503).json({error:'Assinatura não configurada. Instale a chave pública confiável na VPS.'});}
+      try{release=validateRelease(req.body,version,key);}
       catch(error){return res.status(400).json({error:error.message});}
       await fs.mkdir(loc.directory,{recursive:true,mode:0o700});
       if(status?.status==='applied'||status?.status==='failed'){
