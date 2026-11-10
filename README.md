@@ -19,6 +19,8 @@ O G-Fit agora tem um **instalador visual** para aaPanel, no mesmo estilo dos pro
 
 **[Guia completo de instalação no aaPanel](docs/aapanel.md)** — inclui instruções de banco, configuração segura do proxy, atualização e solução de erros.
 
+**Atualizações futuras sem GitHub na VPS:** abra **Administração → Atualizações**, envie um ZIP de release, valide o pacote, digite `APLICAR` para ativar e reinicie o Node.js Project no aaPanel. O ZIP é gerado no computador de desenvolvimento com `npm run release:zip -- --version 0.1.1` (incremente a versão depois). O sistema prepara o build em área privada, exige backup PostgreSQL com `pg_dump` e guarda histórico; o rollback automático protege **somente o código**. Não há assinatura digital dos pacotes nem restauração automática de alterações no banco.
+
 O modo **Docker Compose** abaixo continua disponível como alternativa independente. Não instale Docker e aaPanel sobre o mesmo banco/domínio sem planejar a migração.
 
 ## Começar
