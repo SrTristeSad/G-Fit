@@ -9,6 +9,7 @@ import {pipeline} from 'node:stream/promises';
 import {randomBytes,createHash} from 'node:crypto';
 import {MAGIC,encryptStream,verifyBackup} from '../scripts/backup-lib.mjs';
 import {validateRelease,compareVersions,readZip} from './zip-release.mjs';
+import {readTrustedKey} from './release-trust.mjs';
 
 export const UPDATE_MAX_FILE=32*1024*1024;
 const tracked=[
@@ -83,7 +84,9 @@ export async function verifyPending(privateDir,root){
   const blob=await fs.readFile(loc.pending);
   if(digest(blob)!==state.sha256)throw new Error('O ZIP preparado foi alterado. Descarte-o.');
   const current=await currentVersion(privateDir,root);
-  const release=validateRelease(blob,current);
+  // Trust is pinned outside the release and rechecked before EACH operation.
+  const publicKey=await readTrustedKey(privateDir);
+  const release=validateRelease(blob,current,publicKey);
   if(release.manifest.version!==state.version)throw new Error('Versão do pacote alterada.');
   return {state,release,loc};
 }
@@ -125,9 +128,10 @@ export async function stageRelease(privateDir,root){
   const npm=npmCommand(loc.directory);
   for(const folder of ['api','web']){
     const current=path.join(loc.stage,folder);
-    const hasLock=await has(path.join(current,'package-lock.json'));
-    await writeUpdateState(privateDir,{phase:'Instalando dependências no ambiente temporário: '+folder,progress:folder==='api'?26:49});
-    await execChecked(npm.name,[hasLock?'ci':'install',
+    if(!await has(path.join(current,'package-lock.json')))throw new Error('Release sem package-lock.json: '+folder);
+    await writeUpdateState(privateDir,{phase:'Instalando dependências verificadas: '+folder,progress:folder==='api'?26:49});
+    // No lifecycle scripts from ZIP dependencies are allowed on the aaPanel host.
+    await execChecked(npm.name,['ci','--ignore-scripts',
       folder==='api'?'--omit=dev':'--include=dev','--no-audit','--no-fund'],
       {cwd:current,env:npm.env});
   }
@@ -231,6 +235,14 @@ export async function activateRelease(privateDir,root,env,{stopApi,startApi}){
   const {state,loc}=await verifyPending(privateDir,root);
   if(state.status!=='prepared')throw new Error('Prepare e valide o ZIP antes de aplicar.');
   if(!await has(path.join(loc.stage,'web/dist/index.html')))throw new Error('O staging do React desapareceu.');
+  // Prevent swapping source files after the signed ZIP was prepared.
+  for(const [name,original] of (await verifyPending(privateDir,root)).release.files){
+    if(name==='gfit-release.json')continue;
+    const target=path.join(loc.stage,...name.split('/'));
+    if(!await has(target)||digest(await fs.readFile(target))!==digest(original)){
+      throw new Error('Staging alterado após verificação de assinatura: '+name);
+    }
+  }
   const previousCurrent=await readJson(loc.current,null);
   const snapshot=path.join(loc.snapshots,state.id);
   await fs.mkdir(snapshot,{recursive:true,mode:0o700});
