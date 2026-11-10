@@ -2,6 +2,7 @@
 // Não use para extração genérica de ZIPs. Rejeita links, ZIP64, traversal, nomes duplicados,
 // bombas de descompressão, arquivos ocultos, extras e caminhos fora do código do produto.
 import {createHash} from 'node:crypto';
+import {signManifest,verifyManifest} from './release-trust.mjs';
 import {deflateRawSync,inflateRawSync} from 'node:zlib';
 import {promises as fs} from 'node:fs';
 import path from 'node:path';
@@ -11,11 +12,70 @@ export const ENTRY_MAX_BYTES=8*1024*1024;
 export const TOTAL_MAX_BYTES=96*1024*1024;
 export const FILE_MAX=600;
 export const MIN_RELEASE_FILES=[
-  'package.json','api/package.json','web/package.json','api/src/server.js',
-  'api/src/db.js','aapanel/launcher.mjs','aapanel/update-routes.mjs',
+  'package.json',
+  'api/package.json',
+  'api/package-lock.json',
+  'web/package.json',
+  'web/package-lock.json',
+  'web/index.html',
+  'web/vite.config.js',
+  'api/src/access.js',
+  'api/src/admin-alerts.js',
+  'api/src/admin.js',
+  'api/src/asaas.js',
+  'api/src/assessment-utils.js',
+  'api/src/assessments.js',
+  'api/src/billing-lifecycle.js',
+  'api/src/billing-monitor.js',
+  'api/src/billing.js',
+  'api/src/bootstrap-admin.js',
+  'api/src/classes.js',
+  'api/src/db.js',
+  'api/src/erasure-requests.js',
+  'api/src/plans.js',
+  'api/src/report-utils.js',
+  'api/src/reports.js',
+  'api/src/security.js',
+  'api/src/server.js',
+  'api/src/student-privacy.js',
+  'api/src/weekday.js',
+  'api/src/workouts.js',
+  'web/src/AccessPanel.jsx',
+  'web/src/AccountPanel.jsx',
+  'web/src/AdminAlerts.jsx',
+  'web/src/AdminPanel.jsx',
+  'web/src/BillingOperations.jsx',
+  'web/src/BillingPanel.jsx',
+  'web/src/ClassManager.jsx',
+  'web/src/ExerciseLibrary.jsx',
+  'web/src/PlansPanel.jsx',
+  'web/src/PrivacyRequestsAdmin.jsx',
+  'web/src/ReportsPanel.jsx',
+  'web/src/StudentAssessments.jsx',
+  'web/src/StudentErasureRequest.jsx',
+  'web/src/StudentPrivacy.jsx',
+  'web/src/StudentProfile.jsx',
+  'web/src/StudentWorkouts.jsx',
+  'web/src/SystemUpdates.jsx',
+  'web/src/api.js',
+  'web/src/main.jsx',
+  'web/src/style.css',
+  'aapanel/installer.html',
+  'aapanel/installer.js',
+  'aapanel/launcher.mjs',
+  'aapanel/provision.mjs',
+  'aapanel/release-trust.mjs',
+  'aapanel/setup-utils.mjs',
+  'aapanel/update-core.mjs',
+  'aapanel/update-routes.mjs',
+  'aapanel/zip-release.mjs',
+  'scripts/backup-lib.mjs',
+  'scripts/backup.mjs',
+  'scripts/decrypt-update-backup.mjs',
+  'scripts/generate-backup-key.mjs',
   'scripts/make-release.mjs',
-  'aapanel/update-core.mjs','aapanel/zip-release.mjs',
-  'web/index.html','web/vite.config.js','web/src/main.jsx',
+  'scripts/restore-check.mjs',
+  'scripts/verify-backup.mjs',
 ];
 const exact=new Set(['package.json','api/package.json','web/package.json',
   'api/package-lock.json','web/package-lock.json',
@@ -129,15 +189,17 @@ export function readZip(buffer) {
   validateNames([...files.keys()]);
   return files;
 }
-export function validateRelease(buffer,currentVersion='0.1.0'){
+export function validateRelease(buffer,currentVersion='0.1.0',trustedPublicKey){
   const files=readZip(buffer);
   const raw=files.get('gfit-release.json');
   if(!raw||raw.length>128000)throw new Error('ZIP não contém manifesto G-Fit válido.');
   let manifest;
   try{manifest=JSON.parse(raw.toString('utf8'));}catch{throw new Error('Manifesto JSON inválido.');}
-  if(manifest?.format!=='gfit-release-v1'||!semver(manifest.version)||
+  if(manifest?.format!=='gfit-release-v2'||!semver(manifest.version)||
      compareVersions(manifest.version,currentVersion)<=0||
      !Array.isArray(manifest.files))throw new Error('Release inválida ou versão não superior à atual.');
+  if(!trustedPublicKey)throw new Error('Chave confiável de atualização não configurada.');
+  verifyManifest(manifest,trustedPublicKey);
   if(manifest.files.length!==files.size-1)throw new Error('Manifesto não corresponde ao número de arquivos.');
   for(const required of MIN_RELEASE_FILES)if(!files.has(required))throw new Error('Release incompleta: '+required);
   const validated=new Set();
@@ -176,8 +238,8 @@ export async function collectReleaseFiles(root){
     await walk(directory);
   }
   for(const pkg of ['api/package-lock.json','web/package-lock.json']){
-    try{await fs.access(path.join(root,pkg));names.push(pkg);}
-    catch(error){if(error.code!=='ENOENT')throw error;}
+    await fs.access(path.join(root,pkg));
+    names.push(pkg);
   }
   validateNames(names);
   for(const name of names){
@@ -189,12 +251,14 @@ export async function collectReleaseFiles(root){
   for(const required of MIN_RELEASE_FILES)if(!result.has(required))throw new Error('Falta arquivo obrigatório: '+required);
   return result;
 }
-export function makeReleaseZip(files,version){
+export function makeReleaseZip(files,version,privateKey){
+  if(!privateKey)throw new Error('Assinatura Ed25519 obrigatória: informe uma chave privada.');
+  for(const needed of MIN_RELEASE_FILES)if(!files.has(needed))throw new Error('Release incompleta: '+needed);
   if(!semver(version))throw new Error('Versão deve ser MAJOR.MINOR.PATCH.');
   validateNames([...files.keys()]);
   const entries=[...files.entries()].sort(([a],[b])=>a.localeCompare(b));
-  const manifest={format:'gfit-release-v1',version,createdAt:new Date().toISOString(),
-    files:entries.map(([name,data])=>({path:name,size:data.length,sha256:sha(data)}))};
+  const manifest=signManifest({format:'gfit-release-v2',version,createdAt:new Date().toISOString(),
+    files:entries.map(([name,data])=>({path:name,size:data.length,sha256:sha(data)}))},privateKey);
   entries.push(['gfit-release.json',Buffer.from(JSON.stringify(manifest,null,2)+'\n')]);
   const local=[],central=[];
   let offset=0;
