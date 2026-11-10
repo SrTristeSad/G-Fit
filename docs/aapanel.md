@@ -54,6 +54,7 @@ O servidor de instalação aceita credenciais somente com o domínio através do
 ```nginx
 proxy_set_header Host $host;
 proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Real-IP $remote_addr;
 ```
 
 Edite **somente** a configuração correta do projeto no aaPanel e **faça backup antes de mexer em Nginx**. Não inclua esse cabeçalho em outro bloco sem verificar se já foi configurado; duplicatas podem causar falha em `nginx -t`. O aaPanel gerencia os demais cabeçalhos e o certificado.
@@ -73,7 +74,7 @@ O código tem **8 dígitos** e é conferido pelo servidor. Após cinco erros, a 
 
 ### Dependências
 
-O instalador detecta se existe `package-lock.json` em cada projeto. Com lockfile, usa `npm ci`; sem lockfile, usa `npm install`. Isso evita o erro anterior de tentar usar `npm ci` em um projeto sem `package-lock.json`. O backend instala dependências de produção, e a interface React instala dependências de build para rodar `npm run build`. O build estático gerado é servido pelo Node.
+O G-Fit exige `api/package-lock.json` e `web/package-lock.json`, versionados com hashes de integridade. A instalação utiliza exclusivamente `npm ci --ignore-scripts`, sem fallback para `npm install`. Se um ZIP não contiver ambos os lockfiles completos, será recusado. O frontend ainda executa o build Vite após instalar as dependências.
 
 ## 4. Após a configuração inicial
 
@@ -86,34 +87,50 @@ O instalador detecta se existe `package-lock.json` em cada projeto. Com lockfile
 
 Para configurar o Pix Sandbox, mantenha as chaves **fora do Git**. O instalador deixa o Asaas desabilitado por padrão. Consulte a documentação do módulo financeiro e faça a homologação antes de qualquer uso real.
 
-### Atualização pelo painel — arquivo ZIP, sem GitHub
+### Atualização pelo painel — ZIP assinado, sem GitHub na VPS
 
-Depois que **esta versão com o atualizador** estiver instalada, as próximas atualizações do G-Fit podem ser feitas **sem executar git pull, sem GitHub e sem terminal na VPS**:
+**Passo único antes da primeira atualização:** configure uma chave pública confiável no aaPanel. A chave **privada nunca deve sair do computador que cria a release**. Um ZIP traz a assinatura Ed25519 do seu manifesto; o supervisor verifica essa assinatura com a chave pública instalada **fora do diretório do site**, antes de instalar dependências.
 
-1. Na máquina onde você mantém o código-fonte do G-Fit, prepare uma versão nova e gere um ZIP completo com `npm run release:zip -- --version 0.1.1`. Para cada atualização seguinte, incremente a versão (`0.1.2`, `0.1.3` etc.). O comando salva `releases/gfit-0.1.1.zip`; não inclui `.env`, dados pessoais nem bancos.
-2. Abra o G-Fit no domínio HTTPS e entre com a conta administrativa.
-3. Entre em **Administração → Atualizações** e selecione o ZIP.
-4. Confirme a **senha atual de administrador**, envie o pacote e acompanhe a validação. O servidor verifica caminhos, tamanho, integridade CRC/SHA-256, arquivos obrigatórios, versão superior, extrai em pasta privada, instala dependências em staging e compila o React. A versão em uso continua ativa durante esta preparação.
-5. Confira versão e SHA-256 exibidos na tela. Digite `APLICAR` e confirme a ativação. Antes de trocar o código, o atualizador exige um **backup criptografado do PostgreSQL** via `pg_dump` e uma cópia privada dos arquivos atuais; para isso, o usuário do Node.js deve ter acesso ao cliente PostgreSQL e espaço suficiente no disco.
-6. O supervisor interrompe a API por alguns instantes, ativa os arquivos preparados, inicia a nova API e verifica o endpoint de saúde. Se a ativação falhar, **tenta restaurar automaticamente o código anterior**. Não há restauração automática de dados PostgreSQL: uma migração já executada pode exigir restauração **manual**.
-7. Se a tela indicar ativação concluída, **reinicie o Node.js Project pelo aaPanel** para também carregar qualquer alteração no próprio supervisor. A versão nova permanece registrada em armazenamento privado.
+No **computador de desenvolvimento**, com o código G-Fit:
 
-O painel registra histórico de versão, data, SHA-256 e resultado. O pacote preparado permanece na pasta privada da instalação até a ativação ou descarte. A chave e os backups de atualização também ficam fora da pasta pública do site; o operador deve protegê-los e acompanhar o armazenamento.
+```bash
+# Execute apenas uma vez, usando caminhos FORA da pasta do repositório.
+node scripts/generate-release-keys.mjs ../gfit-releases-private.pem ../gfit-releases-public.pem
+```
 
-**Recuperação manual do banco:** o backup pré-atualização fica em `~/.config/gfit/<identificador>/updates/snapshots/<id>/database.gfitbak` (ou no diretório definido por `GFIT_PRIVATE_DIR`), e a chave em `updates/db-backup-key.hex`. Para descriptografar o backup em um diretório **fora do site**, execute:
+Guarde a chave **privada** com permissão restrita e uma cópia de segurança; não a envie ao aaPanel ou GitHub. Transfira **apenas o arquivo público** ao servidor, por um canal confiável, e confira o fingerprint mostrado pelo gerador. Na **VPS**, como o mesmo usuário que executa o projeto Node.js do aaPanel (normalmente `www`), dentro da pasta G-Fit:
+
+```bash
+node scripts/trust-release-key.mjs /caminho/seguro/gfit-releases-public.pem
+```
+
+A chave pública fica em `~/.config/gfit/<identificador>/trusted-release-key.pem` ou no diretório de `GFIT_PRIVATE_DIR`, com gravação exclusiva do operador. Não há rota HTTP para substituir a chave. O comando não sobrescreve uma chave existente; eventual rotação é um procedimento manual de segurança. Após essa configuração, **as atualizações seguintes são enviadas inteiramente pelo navegador**, sem `git pull` ou GitHub na VPS.
+
+Para cada nova versão, gere um ZIP **assinado** na máquina onde fica a chave privada:
+
+```bash
+npm run release:zip -- --version 0.1.1 --key ../gfit-releases-private.pem
+```
+
+Isso produz `releases/gfit-0.1.1.zip`. Para atualizar, use uma versão maior que a instalada (por exemplo, `0.1.2`). O ZIP não deve conter chaves, `.env` ou dados pessoais.
+
+Na aplicação HTTPS, entre com o administrador e abra **Administração → Atualizações**. O painel mostra a impressão digital da chave pública instalada. Digite a senha administrativa atual, selecione o ZIP e envie. O backend rejeita ZIPs sem assinatura, assinados por outra chave, com CRC/hashes incorretos, com caminhos perigosos, com versões antigas, **sem os módulos essenciais** ou sem os dois lockfiles de dependências.
+
+O supervisor prepara a atualização fora da pasta do aplicativo: **`npm ci --ignore-scripts`**, compilação do React, verificação da assinatura novamente e do conteúdo do estágio. Somente após clicar em **Ativar** e confirmar `APLICAR` ele cria uma cópia do código e um **backup criptografado obrigatório do PostgreSQL via `pg_dump`**, interrompe a API, troca os arquivos e verifica a nova versão. O `pg_dump` precisa estar instalado e acessível ao usuário do aaPanel. Após a ativação, **reinicie o Node.js Project pelo aaPanel** para carregar também eventuais mudanças do supervisor.
+
+**Proteção de migrações:** enquanto não existir um processo independente e testado de rollback do banco, o atualizador ZIP **bloqueia pacotes que modificam `api/src/db.js`**. Uma versão que necessite de alteração no esquema PostgreSQL exige manutenção manual planejada, backup externo validado e teste de restauração. Essa proteção cobre o módulo central de migrações, mas **não garante** que outro código jamais modifique o banco. Se a ativação falhar, o sistema tenta reverter **somente o código**; o banco não é revertido automaticamente.
+
+**Rotação de snapshots:** após atualizações bem-sucedidas, por padrão são mantidas até **três** cópias criptografadas recentes, com proteção ao pacote em uso; a retenção técnica pode ser ajustada com `GFIT_UPDATE_KEEP_SNAPSHOTS` (entre 2 e 20) na configuração do processo. Snapshots de falhas e atualizações recentes devem ser inspecionados pelo operador. Essa rotação **não substitui** backup externo nem constitui política definitiva de retenção ou eliminação segundo a LGPD.
+
+O backup pré-atualização está em `~/.config/gfit/<identificador>/updates/snapshots/<id>/database.gfitbak` (ou `GFIT_PRIVATE_DIR`), e a chave simétrica de recuperação em `updates/db-backup-key.hex`. A rotação pode apagar esses backups locais: **mantenha cópias criptografadas externas e a chave protegida separadamente**, conforme procedimento operacional. A chave privada de assinatura **não** é a chave de descriptografia do banco. Para descriptografar um snapshot em uma pasta privada, execute:
 
 ```bash
 node scripts/decrypt-update-backup.mjs /caminho/database.gfitbak /caminho/updates/db-backup-key.hex /pasta-privada/recuperacao.dump
 ```
 
-Depois, inspecione o dump com `pg_restore --list /pasta-privada/recuperacao.dump` e siga um procedimento operacional de restauração **primeiro em banco isolado**, com o G-Fit interrompido conforme necessário. O comando acima **não restaura automaticamente o banco e não apaga dados**. Proteja o arquivo descriptografado (ele contém dados pessoais) e exclua-o com segurança após a recuperação. **Não copie a chave ou o dump para a pasta pública, não os envie por mensagens e não os inclua no ZIP de atualização.**
+Inspecione o dump com `pg_restore --list /pasta-privada/recuperacao.dump` e restaure **primeiro em banco isolado**, seguindo um procedimento administrativo. Esse comando não apaga nem restaura o banco principal. Não exponha dumps ou chaves em sites, chats ou logs.
 
-
-**Segurança:** o ZIP usa manifesto, CRC e SHA-256 para verificar integridade, mas **não possui assinatura digital de um distribuidor**. Isso significa que um atacante que controle o pacote pode substituí-lo e recalcular os hashes. Instale somente ZIPs que você próprio gerou ou verificou. Atualizações executam código de servidor e não são equivalentes a simplesmente importar dados.
-
-**Pré-requisito:** tenha o executável `pg_dump` acessível no PATH do processo Node do aaPanel, preferencialmente na mesma versão principal do PostgreSQL ou em versão mais recente e compatível. A ativação é bloqueada se o backup do banco não for concluído. Não apague o diretório privado `~/.config/gfit/` ou o banco PostgreSQL ao atualizar.
-
-**Limitações:** os arquivos e dependências do servidor são atualizados; a recuperação de banco e de migrações destrutivas não é automática. Faça um backup operacional independente e teste sua recuperação antes de implantar versões com alterações de banco. Não use este mecanismo ainda para dados sensíveis reais ou instalações comerciais não homologadas. Não existe suporte a pacotes parciais, downgrades, assinatura Ed25519 ou instalação por GitHub remoto.
+A aplicação continuará sendo um **protótipo**: ainda falta uma política completa de retenção, recuperação de desastre, autenticação reforçada para administração e homologação de dados sensíveis/produção.
 
 ### Backups importantes
 
@@ -123,7 +140,10 @@ Os comandos em `scripts/backup.mjs` e `scripts/restore-check.mjs` foram escritos
 
 - **502 no domínio:** confira se a aplicação está em execução no aaPanel e se o Mapping aponta para **127.0.0.1:3333**. Verifique os logs do projeto.
 - **`node: command not found` ou versão errada:** escolha Node.js 22 em **Node version manager → Command line ver**, ou no runtime do Node.js Project.
-- **Falha ao instalar dependências:** confirme acesso à internet, permissões da pasta e saída do processo. Um `npm ci` só é usado quando há lockfile.
+- **Falha ao instalar dependências:** confirme acesso à internet, permissões da pasta e saída do processo. O instalador exige lockfile válido e usa somente `npm ci --ignore-scripts`.
+- **Assinatura não configurada:** gere o par Ed25519 fora do repositório, copie somente a chave pública e execute `node scripts/trust-release-key.mjs` na VPS, com o usuário do projeto.
+- **ZIP rejeitado por migração:** alterações no arquivo central `api/src/db.js` exigem atualização manual supervisionada, não ativação por ZIP.
+- **Rate limiting compartilhado:** confirme que o Nginx sobrescreve `X-Real-IP` com `$remote_addr`. O proxy do G-Fit rejeita IPs malformados e usa loopback quando essa informação não está disponível.
 - **Erro 413 ao enviar ZIP:** confira o limite de upload do Nginx em `client_max_body_size` e permita pelo menos 33 MiB no projeto. Verifique a configuração com `nginx -t` antes de recarregá-la. O limite interno do ZIP permanece em 32 MiB.
 - **Backup obrigatório falhou ao ativar:** instale o cliente `pg_dump` compatível com seu PostgreSQL e torne-o acessível no PATH do usuário do Node.js no aaPanel. O código não será substituído enquanto esse backup não for concluído.
 - **Falha PostgreSQL:** verifique host, porta, senha, acesso e permissões do usuário **gfit** no banco. Se o administrador foi criado em uma tentativa anterior, repita com as **mesmas credenciais**; o instalador não substitui o administrador existente.
