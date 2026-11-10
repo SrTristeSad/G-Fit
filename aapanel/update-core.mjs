@@ -218,6 +218,7 @@ export async function activateRelease(privateDir,root,env,{stopApi,startApi}){
   const {state,loc}=await verifyPending(privateDir,root);
   if(state.status!=='prepared')throw new Error('Prepare e valide o ZIP antes de aplicar.');
   if(!await has(path.join(loc.stage,'web/dist/index.html')))throw new Error('O staging do React desapareceu.');
+  const previousCurrent=await readJson(loc.current,null);
   const snapshot=path.join(loc.snapshots,state.id);
   await fs.mkdir(snapshot,{recursive:true,mode:0o700});
   await writeUpdateState(privateDir,{status:'applying',phase:'Criando backup criptografado do PostgreSQL',progress:5,error:null});
@@ -239,13 +240,17 @@ export async function activateRelease(privateDir,root,env,{stopApi,startApi}){
       status:'applied',phase:'Versão ativada. Reinicie o Node.js Project no aaPanel para carregar também o novo supervisor.',
       progress:100,backupLocation:snapshot,restartRequired:true,
     });
-    await fs.rm(loc.pending,{force:true});
-    await fs.rm(loc.stage,{recursive:true,force:true});
+    // Cleanup is best-effort after activation has been committed. A failure to
+    // remove a staging folder must never roll back a healthy running version.
+    await fs.rm(loc.pending,{force:true}).catch(e=>console.error('ZIP cleanup:',e.message));
+    await fs.rm(loc.stage,{recursive:true,force:true}).catch(e=>console.error('Staging cleanup:',e.message));
   }catch(error){
     if(stopped){
       try{
         await stopApi();
         await restoreCodeSnapshot(root,path.join(snapshot,'code'));
+        if(previousCurrent)await saveJson(loc.current,previousCurrent);
+        else await fs.rm(loc.current,{force:true});
         await startApi(env);
       }catch(rollbackError){
         console.error('CRÍTICO: falha ao reverter código:',rollbackError.message);
