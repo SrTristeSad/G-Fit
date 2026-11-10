@@ -52,6 +52,7 @@ Antes de enviar qualquer senha, abra o projeto no endereço **https://seu-domini
 O servidor de instalação aceita credenciais somente com o domínio através do proxy HTTPS **com `X-Forwarded-Proto: https`**, ou com acesso diretamente via localhost/túnel SSH. Se receber o aviso de transporte inseguro, confira no aaPanel se o **Mapping** e o SSL estão habilitados e se o proxy Nginx sobrescreve esse cabeçalho usando o esquema real:
 
 ```nginx
+proxy_set_header Host $host;
 proxy_set_header X-Forwarded-Proto $scheme;
 ```
 
@@ -123,6 +124,8 @@ Os comandos em `scripts/backup.mjs` e `scripts/restore-check.mjs` foram escritos
 - **502 no domínio:** confira se a aplicação está em execução no aaPanel e se o Mapping aponta para **127.0.0.1:3333**. Verifique os logs do projeto.
 - **`node: command not found` ou versão errada:** escolha Node.js 22 em **Node version manager → Command line ver**, ou no runtime do Node.js Project.
 - **Falha ao instalar dependências:** confirme acesso à internet, permissões da pasta e saída do processo. Um `npm ci` só é usado quando há lockfile.
+- **Erro 413 ao enviar ZIP:** confira o limite de upload do Nginx em `client_max_body_size` e permita pelo menos 33 MiB no projeto. Verifique a configuração com `nginx -t` antes de recarregá-la. O limite interno do ZIP permanece em 32 MiB.
+- **Backup obrigatório falhou ao ativar:** instale o cliente `pg_dump` compatível com seu PostgreSQL e torne-o acessível no PATH do usuário do Node.js no aaPanel. O código não será substituído enquanto esse backup não for concluído.
 - **Falha PostgreSQL:** verifique host, porta, senha, acesso e permissões do usuário **gfit** no banco. Se o administrador foi criado em uma tentativa anterior, repita com as **mesmas credenciais**; o instalador não substitui o administrador existente.
 - **Instalação bloqueada por HTTP:** abra com certificado HTTPS e Mapping correto, ou instale via túnel SSH local.
 - **"Porta 3001 em uso":** não execute outra API G-Fit em paralelo na mesma VPS. Escolha a implantação aaPanel ou Docker, não ambas.
