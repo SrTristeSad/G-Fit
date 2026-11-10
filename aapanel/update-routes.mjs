@@ -1,7 +1,6 @@
 // Rotas administrativas do ZIP updater no G-Fit aaPanel.
 // Requer login administrador + senha atual + Origin da mesma origem.
 // Sem GFIT_UPDATE_SOCKET (Docker), a API informa indisponibilidade.
-import express from 'express';
 import http from 'node:http';
 import {promises as fs} from 'node:fs';
 import path from 'node:path';
@@ -69,7 +68,7 @@ async function passwordGuard(req,res,next) {
   }
   next();
 }
-export function registerZipUpdateRoutes(app,requireTeacher,requireAdmin,rateLimit) {
+export function registerZipUpdateRoutes(app,requireTeacher,requireAdmin,rateLimit,express) {
   const limited=rateLimit({
     windowMs:15*60*1000,limit:8,
     standardHeaders:'draft-8',legacyHeaders:false,
