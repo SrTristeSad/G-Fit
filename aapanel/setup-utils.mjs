@@ -62,7 +62,7 @@ export function isSecureInstallerRequest(req) {
   const host=(req.headers.host||'').toLowerCase();
   // A browser on an HTTP aaPanel domain must NEVER submit setup credentials.
   return (!forwarded || forwarded==='http') &&
-    /^(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::\\d{1,5})?$/.test(host);
+    /^(localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/.test(host);
 }
 export function installCodeMatches(input,code,timingSafeEqualFn) {
   if(typeof input!=='string' || !/^\d{8}$/.test(input))return false;
