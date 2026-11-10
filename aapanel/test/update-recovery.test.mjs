@@ -4,7 +4,7 @@ import {promises as fs} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  writeUpdateState,readJson,updateLocations,recoverInterruptedUpdate,
+  writeUpdateState,readJson,updateLocations,recoverInterruptedUpdate,pruneUpdateSnapshots,
 } from '../update-core.mjs';
 
 async function fixture(callback){
@@ -80,5 +80,26 @@ test('activation completed before crash remains completed after restart',async()
     const status=await readJson(loc.state,null);
     assert.equal(status.status,'applied');
     assert.equal(status.restartRequired,false);
+  });
+});
+
+test('rotation bounds completed update snapshots but preserves current and at least two backups',async()=>{
+  await fixture(async(root,privateDir,loc)=>{
+    await fs.mkdir(loc.snapshots,{recursive:true});
+    const names=Array.from({length:6},(_,i)=>'00000000-0000-4000-8000-'+String(i+1).padStart(12,'0'));
+    for(let i=0;i<names.length;i++){
+      const dir=path.join(loc.snapshots,names[i]);
+      await fs.mkdir(dir);
+      await fs.writeFile(path.join(dir,'database.gfitbak'),'synthetic protected test backup');
+      const when=new Date(Date.UTC(2026,0,i+1));
+      await fs.utimes(dir,when,when);
+    }
+    await writeUpdateState(privateDir,{id:names[0],status:'prepared'});
+    const cleaned=await pruneUpdateSnapshots(privateDir,2);
+    assert.equal(cleaned.kept,3);
+    assert.equal(cleaned.removed,3);
+    const kept=await fs.readdir(loc.snapshots);
+    assert.deepEqual(kept.sort(),[names[0],names[4],names[5]].sort());
+    await assert.rejects(()=>pruneUpdateSnapshots(privateDir,1),/entre 2 e 20/);
   });
 });
