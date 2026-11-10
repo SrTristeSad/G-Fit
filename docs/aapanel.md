@@ -57,6 +57,8 @@ proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header X-Real-IP $remote_addr;
 ```
 
+**Controle de tentativas por cliente:** antes de habilitar o uso do endereço IP encaminhado, confirme que o Nginx **sobrescreve**, e não apenas repassa, `X-Real-IP` usando `$remote_addr`. Em seguida, configure a variável de ambiente **`GFIT_TRUST_REAL_IP=true` no processo Node.js Project do aaPanel** e reinicie o projeto. Sem essa opção, o G-Fit usa o endereço local por segurança e o limite de tentativas pode ser compartilhado entre usuários; habilitar a opção com um proxy que aceite cabeçalhos enviados pelo cliente permitiria falsificar IPs. Se houver outro proxy/CDN antes do aaPanel, configure a cadeia de IP real com cuidado antes de ativar.
+
 Edite **somente** a configuração correta do projeto no aaPanel e **faça backup antes de mexer em Nginx**. Não inclua esse cabeçalho em outro bloco sem verificar se já foi configurado; duplicatas podem causar falha em `nginx -t`. O aaPanel gerencia os demais cabeçalhos e o certificado.
 
 Se necessário, faça a instalação via túnel SSH para `127.0.0.1:3333` e configure o HTTPS antes de usar contas reais.
@@ -143,7 +145,7 @@ Os comandos em `scripts/backup.mjs` e `scripts/restore-check.mjs` foram escritos
 - **Falha ao instalar dependências:** confirme acesso à internet, permissões da pasta e saída do processo. O instalador exige lockfile válido e usa somente `npm ci --ignore-scripts`.
 - **Assinatura não configurada:** gere o par Ed25519 fora do repositório, copie somente a chave pública e execute `node scripts/trust-release-key.mjs` na VPS, com o usuário do projeto.
 - **ZIP rejeitado por migração:** alterações no arquivo central `api/src/db.js` exigem atualização manual supervisionada, não ativação por ZIP.
-- **Rate limiting compartilhado:** confirme que o Nginx sobrescreve `X-Real-IP` com `$remote_addr`. O proxy do G-Fit rejeita IPs malformados e usa loopback quando essa informação não está disponível.
+- **Rate limiting compartilhado:** confirme que o Nginx sobrescreve `X-Real-IP` com `$remote_addr`, habilite `GFIT_TRUST_REAL_IP=true` no processo Node.js do aaPanel e reinicie. Sem a opção, o proxy usa loopback por segurança.
 - **Erro 413 ao enviar ZIP:** confira o limite de upload do Nginx em `client_max_body_size` e permita pelo menos 33 MiB no projeto. Verifique a configuração com `nginx -t` antes de recarregá-la. O limite interno do ZIP permanece em 32 MiB.
 - **Backup obrigatório falhou ao ativar:** instale o cliente `pg_dump` compatível com seu PostgreSQL e torne-o acessível no PATH do usuário do Node.js no aaPanel. O código não será substituído enquanto esse backup não for concluído.
 - **Falha PostgreSQL:** verifique host, porta, senha, acesso e permissões do usuário **gfit** no banco. Se o administrador foi criado em uma tentativa anterior, repita com as **mesmas credenciais**; o instalador não substitui o administrador existente.
