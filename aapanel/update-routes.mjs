@@ -18,7 +18,7 @@ const available=!!(location&&process.env.GFIT_UPDATE_SOCKET&&process.env.GFIT_UP
 const privateDirectory=available?path.resolve(location):null;
 const socket=process.env.GFIT_UPDATE_SOCKET;
 const token=process.env.GFIT_UPDATE_TOKEN;
-const maxHeader=128;
+const maxHeader=1600; // UTF-8 credentials percent-encoded into ASCII HTTP header.
 
 function validOrigin(req) {
   const value=req.get('origin');
@@ -58,8 +58,15 @@ function sendControl(action,id) {
 async function passwordGuard(req,res,next) {
   if(!available)return res.status(503).json({error:'Atualizador ZIP disponível apenas na instalação aaPanel.'});
   if(!validOrigin(req))return res.status(403).json({error:'Origem HTTPS inválida para atualizar o sistema.'});
-  const pass=req.get('x-gfit-admin-password');
-  if(typeof pass!=='string'||pass.length<10||pass.length>maxHeader){
+  const encoded=req.get('x-gfit-admin-password');
+  let pass;
+  try{
+    if(typeof encoded!=='string'||encoded.length>maxHeader)throw new Error('invalid header');
+    pass=decodeURIComponent(encoded);
+  }catch{
+    return res.status(400).json({error:'Senha administrativa enviada em formato inválido.'});
+  }
+  if(pass.length<10||pass.length>128){
     return res.status(400).json({error:'Informe sua senha administrativa atual.'});
   }
   const query=await db.query('SELECT password_hash FROM teachers WHERE id=$1 AND is_admin',[req.teacher.id]);
