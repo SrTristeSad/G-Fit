@@ -38,7 +38,20 @@ test('interrupted activation restores old code and retains database backup',asyn
     await fs.writeFile(path.join(root,'api/src','new.js'),'new version');
     await fs.mkdir(path.join(codeDir,'api/src'),{recursive:true});
     await fs.writeFile(path.join(codeDir,'api/src','old.js'),'old version');
-    await fs.writeFile(path.join(codeDir,'contents.json'),JSON.stringify({available:['api/src']}));
+    const available=['package.json','api/package.json','api/src','web/package.json',
+      'web/src','web/dist','aapanel'];
+    for(const name of available){
+      if(name==='api/src')continue;
+      const target=path.join(codeDir,name);
+      if(path.extname(name)){
+        await fs.mkdir(path.dirname(target),{recursive:true});
+        await fs.writeFile(target,name+' snapshot');
+      }else{
+        await fs.mkdir(target,{recursive:true});
+        await fs.writeFile(path.join(target,'original.js'),'snapshot');
+      }
+    }
+    await fs.writeFile(path.join(codeDir,'contents.json'),JSON.stringify({available}));
     await fs.writeFile(path.join(loc.snapshots,id,'database.gfitbak'),'synthetic encrypted db snapshot');
     await writeUpdateState(privateDir,{
       id,status:'applying',version:'0.1.1',sha256:'b'.repeat(64),progress:50,
