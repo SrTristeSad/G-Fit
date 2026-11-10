@@ -133,6 +133,26 @@ jobs:
           original_count="$(docker compose exec -T db psql -U gfit -d gfit -At -c 'SELECT count(*) FROM teachers' | tr -d '\r\n')"
           test "$original_count" -ge 2
           rm -f "$modified" "$backup" "$other_key" "$key"
+      - name: aaPanel installer unit tests
+        run: node --test aapanel/test/setup-utils.test.mjs
+      - name: aaPanel full installation with disposable PostgreSQL
+        run: |
+          set -euo pipefail
+          name="gfit-aapanel-ci-${GITHUB_RUN_ID}"
+          docker run -d --name "$name" --rm \
+            -e POSTGRES_DB=gfit_install \
+            -e POSTGRES_USER=gfit_install \
+            -e POSTGRES_PASSWORD=ci_aapanel_database_password \
+            -p 127.0.0.1:15432:5432 postgres:16-alpine
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          ready=0
+          for i in $(seq 1 50); do
+            if docker exec "$name" pg_isready -U gfit_install -d gfit_install >/dev/null 2>&1; then ready=1; break; fi
+            sleep 1
+          done
+          test "$ready" = "1"
+          node aapanel/test/installer-e2e.mjs
+          rm -f .aapanel.env
       - name: Stop test services
         if: always()
         env:
