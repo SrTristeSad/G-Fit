@@ -213,7 +213,7 @@ export function makeReleaseZip(files,version){
     c.writeUInt16LE(20,6);c.writeUInt16LE(0x800,8);c.writeUInt16LE(8,10);
     c.writeUInt32LE(value,16);c.writeUInt32LE(packed.length,20);
     c.writeUInt32LE(data.length,24);c.writeUInt16LE(basename.length,28);
-    c.writeUInt32LE(0o100644<<16,38);c.writeUInt32LE(offset,42);
+    c.writeUInt32LE((0o100644<<16)>>>0,38);c.writeUInt32LE(offset,42);
     central.push(c,basename);
     offset+=l.length+basename.length+packed.length;
   }
