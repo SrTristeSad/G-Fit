@@ -364,3 +364,24 @@ textarea:focus { outline: 3px solid #bbebc0; border-color: #276d46; }
   border-bottom:1px solid #e4ebe5;padding:8px 0; }
 .privacy-export-history small { color:#617468; }
 @media(max-width:700px){.student-privacy .actions button{width:100%;}}
+
+
+/* Pedidos de eliminação: triagem declaratória e não destrutiva */
+.privacy-request { display:grid; gap:12px; padding:18px; border:1px solid #cfded5;
+  border-radius:12px; background:#f8fbf9; }
+.privacy-request h3 { margin:0; }
+.privacy-request p { margin:0; }
+.privacy-request form { display:grid; gap:12px; }
+.privacy-request form button { justify-self:start; }
+.privacy-request-history { margin:0; padding-left:18px; display:grid; gap:7px; color:#4d6556; }
+.privacy-review-list { list-style:none; padding:0; margin:14px 0; display:grid; gap:12px; }
+.privacy-review-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:15px;
+  padding:16px; background:#f8fcf9; border:1px solid #dbe8df; border-radius:12px; }
+.privacy-review-list li>div:first-child { display:grid; gap:6px; min-width:0; }
+.privacy-review-list small { color:#607568; overflow-wrap:anywhere; }
+.privacy-review-list code { font-size:12px; }
+.privacy-review-list .actions { display:flex; align-items:center; flex-wrap:wrap; }
+@media(max-width:780px){
+  .privacy-review-list li { grid-template-columns:1fr; }
+  .privacy-review-list .actions button,.privacy-request form button { width:100%; }
+}
