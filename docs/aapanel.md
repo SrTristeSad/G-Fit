@@ -41,7 +41,7 @@ cd /www/wwwroot
 git clone https://github.com/SrTristeSad/G-Fit.git
 ```
 
-O usuário escolhido no aaPanel deve ter **permissão de leitura e gravação no diretório do projeto**, pois o instalador precisa criar `node_modules`, `web/dist` e `.aapanel.env`. Não deixe esse arquivo disponível em diretório estático servido pelo Nginx; o launcher só serve arquivos de `web/dist`.
+O usuário escolhido no aaPanel deve ter **permissão de leitura e gravação no diretório do projeto** (para `node_modules` e `web/dist`) e em sua pasta privada de configuração no diretório inicial. O instalador cria a pasta privada automaticamente, fora do diretório público. O launcher serve somente arquivos de `web/dist`.
 
 **Importante:** a aplicação escuta apenas em **127.0.0.1:3333**, não em `0.0.0.0:3333`. O aaPanel faz o Mapping e publica o domínio na porta 443. Não é necessário liberar a porta 3333 nem a 3001 no firewall. A API interna usa 127.0.0.1:3001.
 
@@ -76,7 +76,7 @@ O instalador detecta se existe `package-lock.json` em cada projeto. Com lockfile
 
 ## 4. Após a configuração inicial
 
-- O launcher grava a conexão PostgreSQL no arquivo **`.aapanel.env`**, com permissão **0600**, e não grava senha administrativa em texto. Nunca comite esse arquivo no GitHub.
+- O launcher grava a conexão PostgreSQL **fora da pasta do site**, em `~/.config/gfit/<identificador-da-instalação>/instance.env`, com pasta privada (0700) e arquivo privado (0600), sob o usuário que executa o projeto. Não grava senha administrativa em texto. Nunca copie esse arquivo para o diretório público nem comite suas credenciais no GitHub.
 - A aplicação passa a servir o React e a API na mesma origem do domínio (porta 3333 atrás do proxy); a API fica na porta interna 3001.
 - O instalador deixa de ficar acessível após a configuração inicial; **não existe rota pública para criar outro administrador**.
 - Para reiniciar o sistema, use **Node.js Project → Restart** no aaPanel, não execute outra instalação.
@@ -87,7 +87,7 @@ Para configurar o Pix Sandbox, mantenha as chaves **fora do Git**. O instalador 
 
 ### Atualização
 
-Faça backup do banco **antes** de atualizar, confira as notas da versão, execute `git pull` na pasta do projeto e reinicie o Node.js Project. Alterações no frontend React exigem novo build: `cd web && npm install --include=dev && npm run build`. Alterações em dependências da API podem exigir `cd api && npm install --omit=dev`. As migrações atuais são aditivas e executadas na inicialização da API. **Não apague `.aapanel.env` para atualizar**: isso reabre a tela de instalação e não remove dados do PostgreSQL.
+Faça backup do banco **antes** de atualizar, confira as notas da versão, execute `git pull` na pasta do projeto e reinicie o Node.js Project. Alterações no frontend React exigem novo build: `cd web && npm install --include=dev && npm run build`. Alterações em dependências da API podem exigir `cd api && npm install --omit=dev`. As migrações atuais são aditivas e executadas na inicialização da API. **Não apague o arquivo `instance.env` da pasta privada para atualizar**: isso reabre a tela de instalação e não remove dados do PostgreSQL.
 
 ### Backups importantes
 
@@ -101,7 +101,7 @@ Os comandos em `scripts/backup.mjs` e `scripts/restore-check.mjs` foram escritos
 - **Falha PostgreSQL:** verifique host, porta, senha, acesso e permissões do usuário **gfit** no banco. Se o administrador foi criado em uma tentativa anterior, repita com as **mesmas credenciais**; o instalador não substitui o administrador existente.
 - **Instalação bloqueada por HTTP:** abra com certificado HTTPS e Mapping correto, ou instale via túnel SSH local.
 - **"Porta 3001 em uso":** não execute outra API G-Fit em paralelo na mesma VPS. Escolha a implantação aaPanel ou Docker, não ambas.
-- **Senha de banco esquecida após instalar:** exige procedimento operacional de rotação de credenciais no PostgreSQL e no arquivo privado; o instalador não oferece um endpoint público de recuperação.
+- **Senha de banco esquecida após instalar:** exige procedimento operacional de rotação de credenciais no PostgreSQL e no arquivo privado `instance.env`; o instalador não oferece um endpoint público de recuperação.
 - **Dados clínicos reais e Pix:** não habilite. O produto ainda é um protótipo sem adequação completa à LGPD e sem homologação de pagamentos de produção.
 
 Documentação aaPanel: [Node.js Project](https://www.aapanel.com/docs/Function/Node.html), [Proxy Project](https://www.aapanel.com/docs/Function/proxy.html).
