@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 import {setTimeout as pause} from 'node:timers/promises';
 import {
   stageRelease,activateRelease,discardRelease,updateLocations,
-  writeUpdateState,readJson,
+  writeUpdateState,readJson,recoverInterruptedUpdate,
 } from './update-core.mjs';
 import {
   validateSetup,formatEnv,parseEnv,isSecureInstallerRequest,
@@ -406,6 +406,7 @@ const server=http.createServer((req,res)=>{
   });
 });
 async function main(){
+  await recoverInterruptedUpdate(privateDir,root);
   await startControl();
   if(await exists(envFile)){
     // Never auto-start a half-configured project.
