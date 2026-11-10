@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node aapanel/launcher.mjs",
     "aapanel": "node aapanel/launcher.mjs",
-    "test": "node --test aapanel/test/setup-utils.test.mjs aapanel/test/zip-release.test.mjs",
+    "test": "node --test aapanel/test/setup-utils.test.mjs aapanel/test/zip-release.test.mjs aapanel/test/update-recovery.test.mjs",
     "release:zip": "node scripts/make-release.mjs"
   }
 }
