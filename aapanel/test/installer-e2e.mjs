@@ -14,7 +14,7 @@ const signing=createKeyPair();
 await fs.writeFile(path.join(privateDir,'trusted-release-key.pem'),signing.publicPem,{mode:0o600});
 const launcher=spawn(process.execPath,['aapanel/launcher.mjs'],{
   cwd:process.cwd(),
-  env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir},
+  env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
   stdio:['ignore','pipe','pipe'],
 });
 let output='';
@@ -127,7 +127,7 @@ try{
   assert.notEqual(launcher.exitCode,null,'launcher did not terminate gracefully');
   restarted=spawn(process.execPath,['aapanel/launcher.mjs'],{
     cwd:process.cwd(),
-    env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir},
+    env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
     stdio:['ignore','pipe','pipe'],
   });
   let restartLog='';
@@ -264,7 +264,7 @@ try{
   for(let i=0;i<80&&restarted.exitCode===null;i++)await pause(100);
   assert.notEqual(restarted.exitCode,null);
   finalRun=spawn(process.execPath,['aapanel/launcher.mjs'],{
-    cwd:process.cwd(),env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir},
+    cwd:process.cwd(),env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
     stdio:['ignore','pipe','pipe'],
   });
   let finalOutput='';
