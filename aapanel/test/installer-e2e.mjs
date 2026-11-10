@@ -35,8 +35,8 @@ try{
   assert.equal(homepage.status,200);
   assert.ok((await homepage.text()).includes('G-Fit | Instalação aaPanel'));
   assert.equal((await request('/setup/status',{code:'0000000X'})).status,403);
-  // Spoofing a public plain-HTTP domain is rejected even with correct code.
-  assert.equal((await request('/setup/status',{code},{Host:'example.test'})).status,403);
+  // Cross-origin setup requests are rejected even with the correct code.
+  assert.equal((await request('/setup/status',{code},{Origin:'http://example.test'})).status,403);
   assert.equal((await request('/setup/status',{code})).data.installed,false);
   const start=await request('/setup/install',{
     code,dbHost:'127.0.0.1',dbPort:15432,dbName:'gfit_install',
