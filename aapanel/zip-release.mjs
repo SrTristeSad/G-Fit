@@ -23,7 +23,7 @@ const exact=new Set(['package.json','api/package.json','web/package.json',
 const roots=['api/src/','web/src/','aapanel/','scripts/'];
 export function allowedReleasePath(name) {
   if(typeof name!=='string'||name.length>240||!name||
-      /[\x00-\x1f\x7f\\]/.test(name)||
+      /[\x00-\x1f\x7f\\:]/.test(name)||
       name.startsWith('/')||name.includes('//')||
       name.split('/').some(seg=>!seg||seg==='.'||seg==='..'||seg.startsWith('.'))||
       /^(?:[A-Za-z]:|\/\/)/.test(name))return false;
@@ -92,7 +92,7 @@ export function readZip(buffer) {
     const mode=(external>>>16)&0xffff;
     if((flag&~0x800)!==0||![0,8].includes(method)||
        extra!==0||comment!==0||length===0||plain>ENTRY_MAX_BYTES||
-       packed>ZIP_MAX_BYTES||local<lastLocalEnd||local>=offset||
+       packed>ZIP_MAX_BYTES||local!==lastLocalEnd||local>=offset||
        (madeBy>>>8)===3 && ((mode&0o170000)!==0o100000)) {
       throw new Error('ZIP contém recursos inseguros ou não suportados.');
     }
