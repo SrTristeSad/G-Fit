@@ -17,3 +17,6 @@ gfit-backup.key
 # Instalador aaPanel: NUNCA versionar credenciais ou estados de instalacao
 .aapanel.env
 .aapanel.env.partial
+
+# Pacotes de atualização gerados localmente (não contém dados pessoais)
+releases/
