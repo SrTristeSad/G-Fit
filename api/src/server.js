@@ -15,7 +15,7 @@ import { registerReportRoutes } from './reports.js';
 import { registerAssessmentRoutes } from './assessments.js';
 import { registerStudentPrivacyRoutes } from './student-privacy.js';
 import { registerErasureRequestRoutes } from './erasure-requests.js';
-import { registerZipUpdateRoutes } from '../../aapanel/update-routes.mjs';
+
 import {
   hashPassword, hashToken, newSessionToken, validEmail, validPassword, verifyPassword,
 } from './security.js';
@@ -253,7 +253,15 @@ registerReportRoutes(app, requireTeacher);
 registerAssessmentRoutes(app, requireTeacher, requireAccessForNewActivity);
 registerStudentPrivacyRoutes(app, requireTeacher, rateLimit);
 registerErasureRequestRoutes(app, requireTeacher, requireAdmin, rateLimit);
-registerZipUpdateRoutes(app, requireTeacher, requireAdmin, rateLimit);
+// O contêiner Docker copia apenas api/: o atualizador roda exclusivamente no aaPanel.
+if (process.env.GFIT_UPDATE_SOCKET) {
+  const {registerZipUpdateRoutes}=await import('../../aapanel/update-routes.mjs');
+  registerZipUpdateRoutes(app, requireTeacher, requireAdmin, rateLimit);
+} else {
+  app.get('/api/admin/system/update',requireTeacher,requireAdmin,(_req,res)=>
+    res.json({supported:false,mode:'docker',
+      message:'Atualização por ZIP disponível apenas na instalação aaPanel.'}));
+}
 
 // O professor só vê os próprios alunos.
 app.get('/api/students', requireTeacher, async (req, res) => {
