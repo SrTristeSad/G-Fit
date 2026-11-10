@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {promises as fs} from 'node:fs';
 import {setTimeout as pause} from 'node:timers/promises';
+import path from 'node:path';
+import os from 'node:os';
 
 const base='http://127.0.0.1:3339';
+const privateDir=await fs.mkdtemp(path.join(os.tmpdir(),'gfit-aapanel-e2e-'));
 const launcher=spawn(process.execPath,['aapanel/launcher.mjs'],{
   cwd:process.cwd(),
-  env:{...process.env,GFIT_PORT:'3339'},
+  env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir},
   stdio:['ignore','pipe','pipe'],
 });
 let output='';
@@ -81,10 +84,15 @@ try{
   assert.equal(me.teacher.isAdmin,true);
   assert.ok(login.headers.get('set-cookie')?.includes('Secure'));
 
-  const config=await fs.readFile('.aapanel.env','utf8');
+  const config=await fs.readFile(path.join(privateDir,'instance.env'),'utf8');
   assert.ok(config.includes('BIND_HOST="127.0.0.1"'));
   assert.ok(config.includes('COOKIE_SECURE="true"'));
   assert.ok(!config.includes('ci-admin-initial-password'));
-  assert.equal((await fs.stat('.aapanel.env')).mode&0o077,0);
+  assert.equal((await fs.stat(path.join(privateDir,'instance.env'))).mode&0o077,0);
+  assert.equal((await fs.stat(privateDir)).mode&0o077,0);
+  assert.equal(await fs.stat('.aapanel.env').then(()=>true,()=>false),false);
   console.log('aaPanel: instalador, PostgreSQL, React, API, login, SSL cookie e bloqueio pós-instalação OK');
-}finally{stop();}
+}finally{
+  stop();
+  await fs.rm(privateDir,{recursive:true,force:true});
+}
