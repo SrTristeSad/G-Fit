@@ -91,6 +91,9 @@ Para configurar o Pix Sandbox, mantenha as chaves **fora do Git**. O instalador 
 
 ### Atualização pelo painel — ZIP assinado, sem GitHub na VPS
 
+**Migração da versão antiga:** se o aaPanel já usa o atualizador **ZIP v1 sem assinatura**, ele não reconhece o novo manifesto **v2 assinado**. Essa passagem exige uma única atualização assistida dos arquivos da aplicação (por exemplo, transferência SFTP ou Gerenciador de Arquivos do aaPanel), com backup independente, manutenção e reinício. **Não exclua o diretório privado da instalação nem o banco PostgreSQL.** Depois de subir esta versão, instale a chave pública confiável; a partir daí, novos ZIPs assinados podem ser enviados pelo próprio painel. Não tente forçar um ZIP v2 pelo atualizador v1 nem desativar as verificações de assinatura.
+
+
 **Passo único antes da primeira atualização:** configure uma chave pública confiável no aaPanel. A chave **privada nunca deve sair do computador que cria a release**. Um ZIP traz a assinatura Ed25519 do seu manifesto; o supervisor verifica essa assinatura com a chave pública instalada **fora do diretório do site**, antes de instalar dependências.
 
 No **computador de desenvolvimento**, com o código G-Fit:
