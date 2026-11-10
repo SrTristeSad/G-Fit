@@ -64,7 +64,7 @@ export function registerErasureRequestRoutes(app,requireTeacher,requireAdmin,rat
       if(!validId(req.params.id) || !origins.includes(req.body?.reportedBy)){
         return res.status(400).json({error:'Informe um aluno válido e a origem declarada do pedido.'});
       }
-      if(req.body.confirmation!=='REGISTER_REVIEW_ONLY'){
+      if(req.body?.confirmation!=='REGISTER_REVIEW_ONLY'){
         return res.status(400).json({error:'Confirme que o registro não apaga dados.'});
       }
       const client=await db.connect();
