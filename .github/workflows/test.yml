@@ -87,6 +87,7 @@ jobs:
           done
           test "$ready" = "1"
           node api/test/student-privacy-e2e.mjs
+          node api/test/erasure-requests-e2e.mjs
           # Segunda janela isolada de autenticação para os testes extensos do Pix.
           docker compose restart api
           ready=0
