@@ -54,9 +54,15 @@ export function isLoopback(addr) {
   return addr==='127.0.0.1'||addr==='::1'||addr==='::ffff:127.0.0.1';
 }
 export function isSecureInstallerRequest(req) {
+  // The service listens on loopback, so only aaPanel Nginx or a local SSH tunnel
+  // can reach it. aaPanel must replace X-Forwarded-Proto with the real scheme.
+  if(!isLoopback(req.socket.remoteAddress))return false;
   const forwarded=req.headers['x-forwarded-proto'];
-  if(typeof forwarded==='string' && forwarded.toLowerCase()==='https')return true;
-  return isLoopback(req.socket.remoteAddress) && !forwarded;
+  if(forwarded==='https')return true;
+  const host=(req.headers.host||'').toLowerCase();
+  // A browser on an HTTP aaPanel domain must NEVER submit setup credentials.
+  return (!forwarded || forwarded==='http') &&
+    /^(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::\\d{1,5})?$/.test(host);
 }
 export function installCodeMatches(input,code,timingSafeEqualFn) {
   if(typeof input!=='string' || !/^\d{8}$/.test(input))return false;
