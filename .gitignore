@@ -6,3 +6,10 @@ dist/
 .DS_Store
 *.log
 coverage/
+
+# Arquivos de recuperacao nao devem entrar no controle de versao
+backups/
+*.gfitbak
+*.gfitbak.*.partial
+*.backup.key
+gfit-backup.key
