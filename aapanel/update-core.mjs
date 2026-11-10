@@ -144,8 +144,15 @@ export async function stageRelease(privateDir,root){
         {cwd:loc.stage});
     }
   }
+  // Rollback of SQL changes is not automatic. Until a separate migration
+  // rehearsal/recovery procedure exists, ZIPs must not alter schema bootstrap.
+  const liveDb=await fs.readFile(path.join(root,'api/src/db.js'));
+  const nextDb=await fs.readFile(path.join(loc.stage,'api/src/db.js'));
+  if(digest(liveDb)!==digest(nextDb)){
+    throw new Error('ZIP altera migrações do PostgreSQL. Atualização de esquema exige procedimento manual homologado; o rollback por ZIP não recupera o banco.');
+  }
   await verifyPending(privateDir,root);
-  await writeUpdateState(privateDir,{status:'prepared',phase:'ZIP verificado, dependências instaladas e React compilado. Pronto para ativação.',progress:100});
+  await writeUpdateState(privateDir,{status:'prepared',phase:'ZIP assinado, lockfiles validados, dependências verificadas e React compilado. Pronto para ativação.',progress:100});
 }
 async function copyPath(source,dest){
   if(!await has(source))return false;
@@ -231,9 +238,42 @@ async function backupDatabase(privateDir,env,destination){
   }catch(e){child.kill();await fs.rm(archive,{force:true});throw e;}
   return archive;
 }
+export async function pruneUpdateSnapshots(privateDir,keep=Number(process.env.GFIT_UPDATE_KEEP_SNAPSHOTS||3)){
+  if(!Number.isSafeInteger(keep)||keep<2||keep>20){
+    throw new Error('GFIT_UPDATE_KEEP_SNAPSHOTS deve estar entre 2 e 20.');
+  }
+  const loc=updateLocations(privateDir);
+  let entries;
+  try{entries=await fs.readdir(loc.snapshots,{withFileTypes:true});}
+  catch(error){if(error.code==='ENOENT')return {kept:0,removed:0};throw error;}
+  const snapshots=[];
+  for(const entry of entries){
+    if(!entry.isDirectory()||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.name))continue;
+    const filename=path.join(loc.snapshots,entry.name);
+    const stat=await fs.lstat(filename);
+    if(!stat.isDirectory())continue;
+    snapshots.push({id:entry.name,filename,mtime:stat.mtimeMs});
+  }
+  snapshots.sort((a,b)=>b.mtime-a.mtime||a.id.localeCompare(b.id));
+  const state=await readJson(loc.state,null);
+  const protectedIds=new Set(snapshots.slice(0,keep).map(row=>row.id));
+  if(state?.id)protectedIds.add(state.id);
+  let removed=0;
+  for(const item of snapshots){
+    if(protectedIds.has(item.id))continue;
+    await fs.rm(item.filename,{recursive:true,force:true});
+    removed++;
+  }
+  return {kept:snapshots.length-removed,removed};
+}
+
 export async function activateRelease(privateDir,root,env,{stopApi,startApi}){
   const {state,loc}=await verifyPending(privateDir,root);
   if(state.status!=='prepared')throw new Error('Prepare e valide o ZIP antes de aplicar.');
+  if(digest(await fs.readFile(path.join(root,'api/src/db.js')))!==
+     digest(await fs.readFile(path.join(loc.stage,'api/src/db.js')))){
+    throw new Error('Mudança de esquema PostgreSQL bloqueada no atualizador ZIP.');
+  }
   if(!await has(path.join(loc.stage,'web/dist/index.html')))throw new Error('O staging do React desapareceu.');
   // Prevent swapping source files after the signed ZIP was prepared.
   for(const [name,original] of (await verifyPending(privateDir,root)).release.files){
@@ -269,6 +309,9 @@ export async function activateRelease(privateDir,root,env,{stopApi,startApi}){
     // remove a staging folder must never roll back a healthy running version.
     await fs.rm(loc.pending,{force:true}).catch(e=>console.error('ZIP cleanup:',e.message));
     await fs.rm(loc.stage,{recursive:true,force:true}).catch(e=>console.error('Staging cleanup:',e.message));
+    await pruneUpdateSnapshots(privateDir).then(result=>{
+      console.log('Rotação de snapshots ZIP: '+result.removed+' cópias antigas descartadas; '+result.kept+' mantidas.');
+    }).catch(e=>console.error('Snapshot rotation:',e.message));
   }catch(error){
     if(stopped){
       try{
