@@ -3,6 +3,7 @@
 // A chave privada NUNCA deve ser copiada para o servidor aaPanel.
 import {promises as fs} from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {createKeyPair,fingerprint} from '../aapanel/release-trust.mjs';
 const [privateName,publicName]=process.argv.slice(2);
 if(!privateName||!publicName||path.resolve(privateName)===path.resolve(publicName)){
@@ -12,7 +13,7 @@ if(!privateName||!publicName||path.resolve(privateName)===path.resolve(publicNam
   const privatePath=path.resolve(privateName),publicPath=path.resolve(publicName);
   try{
     // Não abrir arquivos existentes nem gerar segredos dentro do projeto.
-    const root=path.resolve(path.dirname(new URL(import.meta.url).pathname),'..');
+    const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
     if([privatePath,publicPath].some(p=>p===root||p.startsWith(root+path.sep))){
       throw new Error('Salve ambas as chaves fora da pasta G-Fit.');
     }
