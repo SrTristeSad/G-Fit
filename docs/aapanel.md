@@ -99,6 +99,15 @@ Depois que **esta versão com o atualizador** estiver instalada, as próximas at
 
 O painel registra histórico de versão, data, SHA-256 e resultado. O pacote preparado permanece na pasta privada da instalação até a ativação ou descarte. A chave e os backups de atualização também ficam fora da pasta pública do site; o operador deve protegê-los e acompanhar o armazenamento.
 
+**Recuperação manual do banco:** o backup pré-atualização fica em `~/.config/gfit/<identificador>/updates/snapshots/<id>/database.gfitbak` (ou no diretório definido por `GFIT_PRIVATE_DIR`), e a chave em `updates/db-backup-key.hex`. Para descriptografar o backup em um diretório **fora do site**, execute:
+
+```bash
+node scripts/decrypt-update-backup.mjs /caminho/database.gfitbak /caminho/updates/db-backup-key.hex /pasta-privada/recuperacao.dump
+```
+
+Depois, inspecione o dump com `pg_restore --list /pasta-privada/recuperacao.dump` e siga um procedimento operacional de restauração **primeiro em banco isolado**, com o G-Fit interrompido conforme necessário. O comando acima **não restaura automaticamente o banco e não apaga dados**. Proteja o arquivo descriptografado (ele contém dados pessoais) e exclua-o com segurança após a recuperação. **Não copie a chave ou o dump para a pasta pública, não os envie por mensagens e não os inclua no ZIP de atualização.**
+
+
 **Segurança:** o ZIP usa manifesto, CRC e SHA-256 para verificar integridade, mas **não possui assinatura digital de um distribuidor**. Isso significa que um atacante que controle o pacote pode substituí-lo e recalcular os hashes. Instale somente ZIPs que você próprio gerou ou verificou. Atualizações executam código de servidor e não são equivalentes a simplesmente importar dados.
 
 **Pré-requisito:** tenha o executável `pg_dump` acessível no PATH do processo Node do aaPanel, preferencialmente na mesma versão principal do PostgreSQL ou em versão mais recente e compatível. A ativação é bloqueada se o backup do banco não for concluído. Não apague o diretório privado `~/.config/gfit/` ou o banco PostgreSQL ao atualizar.
