@@ -12,7 +12,7 @@ export function privateDirectoryFor(root){
 }
 export function trustedKeyPath(privateDir){return path.join(privateDir,TRUSTED_KEY_NAME);}
 export function fingerprint(key){
-  const publicKey=createPublicKey(key);
+  const publicKey=key?.type==='public'?key:createPublicKey(key);
   if(publicKey.asymmetricKeyType!=='ed25519')throw new Error('A chave deve usar Ed25519.');
   return createHash('sha256').update(publicKey.export({type:'spki',format:'der'})).digest('hex');
 }
