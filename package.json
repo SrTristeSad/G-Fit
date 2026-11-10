@@ -1,0 +1,15 @@
+{
+  "name": "gfit-aapanel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Inicializador aaPanel do G-Fit — instalador e servidor Node.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node aapanel/launcher.mjs",
+    "aapanel": "node aapanel/launcher.mjs",
+    "test": "node --test aapanel/test/setup-utils.test.mjs"
+  }
+}
