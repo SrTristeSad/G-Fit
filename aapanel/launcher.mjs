@@ -2,9 +2,10 @@
 // Requer Node 22. Configure Node.js Project Mapping + SSL no aaPanel antes do formulário.
 import http from 'node:http';
 import {spawn} from 'node:child_process';
-import {randomInt,timingSafeEqual} from 'node:crypto';
+import {randomInt,timingSafeEqual,createHash} from 'node:crypto';
 import {promises as fs,createReadStream} from 'node:fs';
 import path from 'node:path';
+import {homedir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as pause} from 'node:timers/promises';
 import {
@@ -17,7 +18,15 @@ const root=path.resolve(here,'..');
 const apiDir=path.join(root,'api');
 const webDir=path.join(root,'web');
 const distDir=path.join(webDir,'dist');
-const envFile=path.join(root,'.aapanel.env');
+const privateDir=path.resolve(
+  process.env.GFIT_PRIVATE_DIR ||
+  path.join(homedir(),'.config','gfit',
+    createHash('sha256').update(root).digest('hex').slice(0,16)),
+);
+if(privateDir===root||privateDir.startsWith(root+path.sep)) {
+  throw new Error('O diretório de segredos deve ficar fora da pasta do site.');
+}
+const envFile=path.join(privateDir,'instance.env');
 const port=Number(process.env.GFIT_PORT||3333);
 const host=process.env.GFIT_HOST||'127.0.0.1';
 if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('Porta inválida.');
@@ -148,6 +157,8 @@ async function install(input){
   state.phase='Iniciando API';
   await startApi(env);
   state.phase='Salvando configuração privada';
+  await fs.mkdir(privateDir,{recursive:true,mode:0o700});
+  await fs.chmod(privateDir,0o700);
   // Gravado somente após validação de credenciais, banco, frontend e API.
   const temp=envFile+'.partial';
   await fs.writeFile(temp,formatEnv(env),{flag:'wx',mode:0o600});
