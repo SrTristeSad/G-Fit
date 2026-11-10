@@ -16,7 +16,11 @@ const launcher=spawn(process.execPath,['aapanel/launcher.mjs'],{
 let output='';
 launcher.stdout.on('data',chunk=>{output+=String(chunk);});
 launcher.stderr.on('data',chunk=>{output+=String(chunk);});
-const stop=()=>launcher.kill('SIGTERM');
+let restarted=null;
+const stop=()=>{
+  launcher.kill('SIGTERM');
+  restarted?.kill('SIGTERM');
+};
 try{
   let code=null;
   for(let i=0;i<100;i++){
@@ -91,7 +95,31 @@ try{
   assert.equal((await fs.stat(path.join(privateDir,'instance.env'))).mode&0o077,0);
   assert.equal((await fs.stat(privateDir)).mode&0o077,0);
   assert.equal(await fs.stat('.aapanel.env').then(()=>true,()=>false),false);
-  console.log('aaPanel: instalador, PostgreSQL, React, API, login, SSL cookie e bloqueio pós-instalação OK');
+  console.log('aaPanel: instalação inicial, PostgreSQL, React, API e login OK');
+  // aaPanel restarts the launcher after updates; credentials must load from the
+  // private config without revealing the setup wizard or creating new accounts.
+  launcher.kill('SIGTERM');
+  for(let i=0;i<60&&launcher.exitCode===null;i++)await pause(100);
+  assert.notEqual(launcher.exitCode,null,'launcher did not terminate gracefully');
+  restarted=spawn(process.execPath,['aapanel/launcher.mjs'],{
+    cwd:process.cwd(),
+    env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir},
+    stdio:['ignore','pipe','pipe'],
+  });
+  let restartLog='';
+  restarted.stdout.on('data',chunk=>{restartLog+=String(chunk);});
+  restarted.stderr.on('data',chunk=>{restartLog+=String(chunk);});
+  let reopened=false;
+  for(let i=0;i<100;i++){
+    await pause(200);
+    const res=await fetch(base+'/api/health').catch(()=>null);
+    if(res?.ok){reopened=true;break;}
+    if(restarted.exitCode!==null)break;
+  }
+  assert.equal(reopened,true,'failed to relaunch installed aaPanel app: '+restartLog.slice(-1200));
+  assert.equal((await fetch(base+'/setup')).status,404);
+  assert.equal(restartLog.includes('CÓDIGO DE INSTALAÇÃO:'),false);
+  console.log('aaPanel: instalação única, segredos externos, reinício e recuperação de serviço OK');
 }finally{
   stop();
   await fs.rm(privateDir,{recursive:true,force:true});
