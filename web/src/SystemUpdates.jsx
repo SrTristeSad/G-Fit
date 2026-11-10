@@ -46,7 +46,7 @@ export default function SystemUpdates(){
     try{
       await api('/api/admin/system/update/'+endpoint,{
         method:'POST',
-        headers:{'X-GFit-Admin-Password':password},
+        headers:{'X-GFit-Admin-Password':encodeURIComponent(password)},
         body:JSON.stringify(body),
       });
       setPassword('');
@@ -69,7 +69,7 @@ export default function SystemUpdates(){
     try{
       const response=await fetch('/api/admin/system/update/upload',{
         method:'POST',credentials:'same-origin',cache:'no-store',
-        headers:{'Content-Type':'application/zip','X-GFit-Admin-Password':password},
+        headers:{'Content-Type':'application/zip','X-GFit-Admin-Password':encodeURIComponent(password)},
         body:file,
       });
       const payload=await response.json().catch(()=>({}));
