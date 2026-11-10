@@ -6,6 +6,7 @@ import {randomInt,timingSafeEqual,createHash,randomBytes} from 'node:crypto';
 import {promises as fs,createReadStream} from 'node:fs';
 import path from 'node:path';
 import {homedir} from 'node:os';
+import {isIP} from 'node:net';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as pause} from 'node:timers/promises';
 import {
@@ -342,7 +343,12 @@ function proxyApi(req,res){
     delete headers[key];
   }
   // aaPanel should set this header; do not trust arbitrary chains of proxies.
-  headers['x-forwarded-for']='127.0.0.1';
+  // aaPanel Nginx MUST set X-Real-IP using $remote_addr (overwriting
+  // arbitrary client headers). Accept only a single valid IP; fallback to
+  // loopback for SSH tunnels or panels without this trusted proxy setting.
+  const realIp=req.headers['x-real-ip'];
+  headers['x-forwarded-for']=typeof realIp==='string'&&isIP(realIp)?realIp:'127.0.0.1';
+  delete headers['x-real-ip'];
   headers['x-forwarded-proto']=req.headers['x-forwarded-proto']==='https'?'https':'http';
   // Same-origin validation for admin ZIP uploads, always derived from the public request.
   headers['x-gfit-public-host']=req.headers.host||'';
