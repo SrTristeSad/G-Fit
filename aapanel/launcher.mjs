@@ -328,9 +328,20 @@ async function main(){
 }
 for(const signal of ['SIGINT','SIGTERM']){
   process.on(signal,()=>{
+    if(closing)return;
     closing=true;
-    if(apiChild)apiChild.kill(signal);
-    server.close(()=>process.exit(0));
+    const active=apiChild;
+    if(active&&active.exitCode===null){
+      const watchdog=setTimeout(()=>active.kill('SIGKILL'),3500);
+      watchdog.unref();
+      active.once('exit',()=>{
+        clearTimeout(watchdog);
+        server.close(()=>process.exit(0));
+      });
+      active.kill(signal);
+    }else{
+      server.close(()=>process.exit(0));
+    }
   });
 }
 await main();
