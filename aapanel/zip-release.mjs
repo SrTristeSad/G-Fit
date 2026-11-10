@@ -13,13 +13,14 @@ export const FILE_MAX=600;
 export const MIN_RELEASE_FILES=[
   'package.json','api/package.json','web/package.json','api/src/server.js',
   'api/src/db.js','aapanel/launcher.mjs','aapanel/update-routes.mjs',
+  'scripts/make-release.mjs',
   'aapanel/update-core.mjs','aapanel/zip-release.mjs',
   'web/index.html','web/vite.config.js','web/src/main.jsx',
 ];
 const exact=new Set(['package.json','api/package.json','web/package.json',
   'api/package-lock.json','web/package-lock.json',
   'web/index.html','web/vite.config.js']);
-const roots=['api/src/','web/src/','aapanel/'];
+const roots=['api/src/','web/src/','aapanel/','scripts/'];
 export function allowedReleasePath(name) {
   if(typeof name!=='string'||name.length>240||!name||
       /[\x00-\x1f\x7f\\]/.test(name)||
@@ -161,7 +162,7 @@ export async function collectReleaseFiles(root){
   const result=new Map();
   const names=['package.json','api/package.json','web/package.json',
     'web/index.html','web/vite.config.js'];
-  for(const directory of ['api/src','web/src','aapanel']){
+  for(const directory of ['api/src','web/src','aapanel','scripts']){
     async function walk(dir){
       for(const item of await fs.readdir(path.join(root,dir),{withFileTypes:true})){
         const rel=dir+'/'+item.name;
