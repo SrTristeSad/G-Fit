@@ -236,6 +236,28 @@ async function installDependencies(folder,includeDev){
   await exec('npm',['ci','--ignore-scripts',includeDev?'--include=dev':'--omit=dev',
     '--no-audit','--no-fund'],folder,await npmEnvironment());
 }
+// A source-only ZIP does not carry node_modules. On a previously configured
+// aaPanel installation the setup wizard is skipped, so restore missing runtime
+// packages before launching the API rather than crashing with ERR_MODULE_NOT_FOUND.
+async function repairMissingRuntimeDependencies(){
+  const required=['express','cookie-parser','helmet','express-rate-limit','pg'];
+  const missing=[];
+  for(const name of required){
+    if(!await exists(path.join(apiDir,'node_modules',name,'package.json')))missing.push(name);
+  }
+  if(!missing.length)return;
+  state.phase='Restaurando dependências da API';
+  console.warn('G-Fit: dependências da API ausentes ('+missing.join(', ')+'). '+
+    'O ZIP de instalação não inclui node_modules; executando npm ci na pasta api/.');
+  await installDependencies(apiDir,false);
+  for(const name of required){
+    if(!await exists(path.join(apiDir,'node_modules',name,'package.json'))){
+      throw new Error('Dependência '+name+' continua ausente após npm ci. '+
+        'Verifique o lockfile e as permissões da pasta api/.');
+    }
+  }
+  console.log('G-Fit: dependências da API restauradas.');
+}
 async function waitApiReady(child){
   // A API pede uma porta livre ao sistema operacional (PORT=0). O número
   // realmente reservado é comunicado por IPC, sem sondar nem disputar 3001.
@@ -534,6 +556,9 @@ async function main(){
       throw new Error('Permissões inseguras em .aapanel.env: use chmod 600.');
     }
     const env=parseEnv(await fs.readFile(envFile,'utf8'));
+    // Manual ZIP extraction onto an installed project can omit node_modules.
+    // Repair only when required runtime packages are missing, never touch the DB.
+    await repairMissingRuntimeDependencies();
     await startApi(env);
     state.installed=true;
     state.phase='Aplicação pronta';
