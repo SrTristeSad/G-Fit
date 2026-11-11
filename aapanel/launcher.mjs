@@ -9,6 +9,7 @@ import {homedir} from 'node:os';
 import {isIP} from 'node:net';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as pause} from 'node:timers/promises';
+import {trustedKeyPath,readTrustedKey,fingerprint} from './release-trust.mjs';
 import {
   stageRelease,activateRelease,discardRelease,updateLocations,
   writeUpdateState,readJson,recoverInterruptedUpdate,
@@ -302,6 +303,22 @@ async function startApi(env){
     }
   });
 }
+// Bind the public update authority to this installation only after
+// the administrator, database and API are ready. Never store private keys.
+async function installReleasePublicKey(publicKey){
+  await fs.mkdir(privateDir,{recursive:true,mode:0o700});
+  const target=trustedKeyPath(privateDir);
+  try{
+    await fs.writeFile(target,publicKey,{flag:'wx',mode:0o600});
+  }catch(error){
+    if(error.code!=='EEXIST')throw error;
+    const trusted=await readTrustedKey(privateDir);
+    if(fingerprint(trusted)!==fingerprint(publicKey)){
+      throw new Error('Já existe outra chave pública de atualizações nesta instalação. '+
+        'Não será substituída automaticamente.');
+    }
+  }
+}
 async function install(input){
   state.phase='Instalando dependências da API';
   await installDependencies(apiDir,false);
@@ -328,6 +345,8 @@ async function install(input){
   delete env.GFIT_SETUP_ADMIN_PASSWORD;
   state.phase='Iniciando API';
   await startApi(env);
+  state.phase='Configurando chave pública de atualizações';
+  await installReleasePublicKey(input.releasePublicKey);
   state.phase='Salvando configuração privada';
   await fs.mkdir(privateDir,{recursive:true,mode:0o700});
   await fs.chmod(privateDir,0o700);
@@ -392,7 +411,7 @@ async function setupHandler(req,res,url){
   if(state.installed||await exists(envFile))return respond(res,409,{error:'Já instalado.'});
   const valid=validateSetup(input);
   if(!valid)return respond(res,400,{
-    error:'Confira host, porta, nome/usuário do banco, senha e credenciais do administrador.',
+    error:'Confira os dados do banco, as credenciais e a chave pública Ed25519 de atualizações.',
   });
   state.running=true;
   state.error=null;
