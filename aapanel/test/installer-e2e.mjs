@@ -17,11 +17,15 @@ await fs.writeFile(path.join(privateDir,'trusted-release-key.pem'),signing.publi
 const occupied=[];
 for(const port of [3001,3333]){
   const blocker=createServer();
-  await new Promise((resolve,reject)=>{
-    blocker.once('error',reject);
-    blocker.listen(port,'127.0.0.1',resolve);
+  const available=await new Promise((resolve,reject)=>{
+    blocker.once('error',error=>{
+      // A pre-existing listener is precisely what this scenario tests.
+      if(error.code==='EADDRINUSE')resolve(false);
+      else reject(error);
+    });
+    blocker.listen(port,'127.0.0.1',()=>resolve(true));
   });
-  occupied.push(blocker);
+  if(available)occupied.push(blocker);
 }
 const launcher=spawn(process.execPath,['aapanel/launcher.mjs'],{
   cwd:process.cwd(),
