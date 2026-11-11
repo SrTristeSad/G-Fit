@@ -64,10 +64,10 @@ test('installer same-origin is preserved when aaPanel rewrites upstream Host',()
   });
   const browserOrigin='https://livro.snulog.shop';
   assert.equal(isAllowedInstallerOrigin(req(browserOrigin)),true);
-  assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'livro.snulog.shop',undefined)),true);
+  assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'livro.snulog.shop',null)),true);
   assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'127.0.0.1:3344','cross-site')),false);
   assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'127.0.0.1:3344','same-site')),false);
-  assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'127.0.0.1:3344',undefined)),false);
+  assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'127.0.0.1:3344',null)),false);
   assert.equal(isAllowedInstallerOrigin(req('https://evil.example','livro.snulog.shop','cross-site')),false);
   assert.equal(isAllowedInstallerOrigin(req('http://livro.snulog.shop','127.0.0.1:3344','same-origin')),false);
   assert.equal(isAllowedInstallerOrigin(req('null')),false);
