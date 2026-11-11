@@ -7,6 +7,78 @@ const phase=document.getElementById('phase');
 const retry=document.getElementById('retry');
 const openApp=document.getElementById('open-app');
 const field=name=>document.getElementById(name).value;
+const generateKeyButton=document.getElementById('generate-key');
+const downloadKeyButton=document.getElementById('download-key');
+const keyStatus=document.getElementById('key-status');
+const keyFingerprint=document.getElementById('key-fingerprint');
+const keyBackedUp=document.getElementById('key-backed-up');
+let publicSigningKey=null;
+let privateSigningKey=null;
+
+// CryptoKey generation runs inside HTTPS WebCrypto; the private key is never
+// sent to the backend, stored in localStorage or saved on the aaPanel server.
+function pemFor(bytes,label){
+  const data=String.fromCharCode(...new Uint8Array(bytes));
+  const encoded=btoa(data);
+  return '-----BEGIN '+label+'-----\\n'+
+    (encoded.match(/.{1,64}/g)||[]).join('\\n')+
+    '\\n-----END '+label+'-----\\n';
+}
+function downloadPrivateKey(){
+  if(!privateSigningKey)return;
+  const blob=new Blob([privateSigningKey],{type:'application/x-pem-file'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download='gfit-chave-privada-atualizacoes.pem';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+generateKeyButton.addEventListener('click',async()=>{
+  generateKeyButton.disabled=true;
+  keyBackedUp.checked=false;
+  keyBackedUp.disabled=true;
+  publicSigningKey=null;
+  privateSigningKey=null;
+  downloadKeyButton.classList.add('hidden');
+  keyFingerprint.classList.add('hidden');
+  keyStatus.classList.remove('hidden');
+  keyStatus.textContent='Gerando par de chaves no navegador…';
+  try{
+    if(!window.isSecureContext || !crypto?.subtle){
+      throw new Error('Use HTTPS ou localhost para gerar as chaves com segurança.');
+    }
+    const keys=await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify']);
+    const [pub,priv]=await Promise.all([
+      crypto.subtle.exportKey('spki',keys.publicKey),
+      crypto.subtle.exportKey('pkcs8',keys.privateKey),
+    ]);
+    // Confirm that the pair really works before presenting it.
+    const proof=new TextEncoder().encode('G-Fit signing key verification');
+    const signature=await crypto.subtle.sign('Ed25519',keys.privateKey,proof);
+    if(!await crypto.subtle.verify('Ed25519',keys.publicKey,signature,proof)){
+      throw new Error('O par de chaves falhou na verificação local.');
+    }
+    const digest=await crypto.subtle.digest('SHA-256',pub);
+    const fingerprint=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+    publicSigningKey=pemFor(pub,'PUBLIC KEY');
+    privateSigningKey=pemFor(priv,'PRIVATE KEY');
+    keyStatus.textContent='Chave criada neste navegador. Salve o arquivo baixado e confirme o backup antes de instalar.';
+    keyFingerprint.textContent='Fingerprint SHA-256: '+fingerprint;
+    keyFingerprint.classList.remove('hidden');
+    downloadKeyButton.classList.remove('hidden');
+    keyBackedUp.disabled=false;
+    downloadPrivateKey();
+  }catch(error){
+    keyStatus.textContent='Não foi possível gerar chaves Ed25519: '+error.message+
+      ' Atualize seu navegador e tente novamente.';
+  }finally{
+    generateKeyButton.disabled=false;
+  }
+});
+downloadKeyButton.addEventListener('click',downloadPrivateKey);
 
 async function post(path,payload){
   const response=await fetch(path,{
@@ -79,12 +151,21 @@ form.addEventListener('submit',async e=>{
   const input=Object.fromEntries(fields.map(name=>[name,field(name)]));
   input.dbPort=Number(field('dbPort'));
   input.code=field('code').trim();
+  if(!publicSigningKey || !keyBackedUp.checked){
+    showError('Gere a chave de atualizações, salve a chave privada e confirme o backup antes de instalar.');
+    return;
+  }
+  input.releasePublicKey=publicSigningKey;
   if(input.adminPassword!==input.adminConfirm){
     showError('As senhas do administrador não coincidem.');return;
   }
   submit.disabled=true;
   try{
     await post('/setup/install',input);
+    // The private key has already been downloaded and confirmed; no longer
+    // needed in the page memory. Only the public key crossed the network.
+    privateSigningKey=null;
+    downloadKeyButton.classList.add('hidden');
     // Limpar senhas do HTML: mantidas somente em memória pelo processo instalador.
     for(const name of ['dbPassword','adminPassword','adminConfirm']){
       document.getElementById(name).value='';
