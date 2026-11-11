@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {timingSafeEqual} from 'node:crypto';
 import {
   validateSetup,formatEnv,parseEnv,
-  isSecureInstallerRequest,installCodeMatches,
+  isSecureInstallerRequest,installCodeMatches,resolvePublicPort,
 } from '../setup-utils.mjs';
 
 const sample={
@@ -56,4 +56,17 @@ test('setup rejects plain HTTP mapped domains; allows local SSH tunnel and TLS m
   assert.equal(isSecureInstallerRequest(req('example.com')),false);
   assert.equal(isSecureInstallerRequest(req('example.com','https')),true);
   assert.equal(isSecureInstallerRequest(req('example.com','https','1.2.3.4')),false);
+});
+
+test('aaPanel public port honors CLI, GFIT_PORT and standard PORT without source edits',()=>{
+  assert.equal(resolvePublicPort(),3333);
+  assert.equal(resolvePublicPort({env:{PORT:'3344'}}),3344);
+  assert.equal(resolvePublicPort({env:{GFIT_PORT:'3355',PORT:'3344'}}),3355);
+  assert.equal(resolvePublicPort({argv:['--port','3366'],env:{GFIT_PORT:'3355'}}),3366);
+  assert.equal(resolvePublicPort({argv:['--port=3377'],env:{PORT:'3344'}}),3377);
+  for(const wrong of ['0','443','65536','abc','3333; echo danger','-1','3.5','']){
+    assert.throws(()=>resolvePublicPort({env:{PORT:wrong}}),/Porta inválida/);
+  }
+  assert.throws(()=>resolvePublicPort({argv:['--port']}),/Informe um número/);
+  assert.throws(()=>resolvePublicPort({argv:['--port=3377','--port=3378']}),/apenas uma/);
 });
