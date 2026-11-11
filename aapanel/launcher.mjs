@@ -446,6 +446,22 @@ const server=http.createServer((req,res)=>{
     else res.destroy();
   });
 });
+// A porta pública é escolhida pelo aaPanel. Nunca trocar silenciosamente
+// para outra porta, pois o Mapping do domínio continuaria na porta anterior.
+server.on('error',error=>{
+  if(error.code==='EADDRINUSE'){
+    console.error('G-Fit: porta '+port+' ocupada por outro projeto. '+
+      'Escolha uma porta livre em Project Port e use npm start -- --port=NUMERO, '+
+      'com o mesmo número, sem alterar o código.');
+  }else{
+    console.error('G-Fit: não foi possível abrir a porta '+port+': '+error.message);
+  }
+  closing=true;
+  if(apiChild)apiChild.kill('SIGTERM');
+  controlServer?.close();
+  void fs.rm(controlSocket,{force:true}).catch(()=>{});
+  process.exitCode=1;
+});
 async function main(){
   await recoverInterruptedUpdate(privateDir,root);
   await startControl();
