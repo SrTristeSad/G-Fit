@@ -22,6 +22,22 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npm test
           npm run build
+      - name: Package deployable source and built frontend
+        run: |
+          set -euo pipefail
+          export STAGE="$RUNNER_TEMP/gfit-package"
+          mkdir -p "$STAGE"
+          git archive HEAD | tar -x -C "$STAGE"
+          cp -a web/dist "$STAGE/web/dist"
+          (cd "$STAGE" && zip -q -r "$RUNNER_TEMP/gfit-source-built.zip" .)
+          unzip -tq "$RUNNER_TEMP/gfit-source-built.zip"
+      - name: Upload installable source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: gfit-source-built
+          path: ${{ runner.temp }}/gfit-source-built.zip
+          if-no-files-found: error
+          retention-days: 7
       - name: Validate Docker Compose
         env:
           POSTGRES_PASSWORD: test_only_not_for_production
