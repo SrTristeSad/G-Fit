@@ -224,7 +224,7 @@ function AuditList({ events }) {
   );
 }
 
-export default function AdminPanel({ onOpenSecurity }) {
+export default function AdminPanel({ view = 'overview', onNavigate, onOpenSecurity }) {
   const [teachers, setTeachers] = useState([]);
   const [plans, setPlans] = useState([]);
   const [accessTerms, setAccessTerms] = useState([]);
@@ -232,7 +232,6 @@ export default function AdminPanel({ onOpenSecurity }) {
   const [overview, setOverview] = useState(null);
   const [billing, setBilling] = useState(null);
   const [events, setEvents] = useState([]);
-  const [view, setView] = useState('overview');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -300,7 +299,7 @@ export default function AdminPanel({ onOpenSecurity }) {
                 <button key={item.id} type="button"
                   className={view === item.id ? 'active' : ''}
                   aria-current={view === item.id ? 'page' : undefined}
-                  onClick={() => setView(item.id)}>
+                  onClick={() => onNavigate(item.id)}>
                   <span>{item.label}</span>
                   {item.id === 'alerts' && alertsSummary.open > 0 &&
                     <span className="admin-nav-count">{alertsSummary.open}</span>}
@@ -330,7 +329,7 @@ export default function AdminPanel({ onOpenSecurity }) {
               <h2>O que está acontecendo no G Fit</h2>
               <p className="muted">Indicadores agregados, sem exposição de fichas individuais.</p>
             </div>
-            <button type="button" className="secondary-light" onClick={() => setView('teachers')}>
+            <button type="button" className="secondary-light" onClick={() => onNavigate('teachers')}>
               Gerenciar professores
             </button>
           </div>
@@ -374,7 +373,7 @@ export default function AdminPanel({ onOpenSecurity }) {
                 <div><dt>Vigências agendadas</dt><dd>{overview?.manualAccessScheduled ?? '—'}</dd></div>
               </dl>
               <div className="admin-summary-actions">
-                <button type="button" className="secondary-light" onClick={() => setView('access')}>Ver vigências</button>
+                <button type="button" className="secondary-light" onClick={() => onNavigate('access')}>Ver vigências</button>
               </div>
             </section>
           </div>
@@ -385,7 +384,7 @@ export default function AdminPanel({ onOpenSecurity }) {
               <p className="muted">{billing?.message || 'Sem dados financeiros disponíveis.'}</p>
               <small>Pix somente no Sandbox. Esta área não representa faturamento real.</small>
             </div>
-            <button type="button" className="secondary-light" onClick={() => setView('billing')}>
+            <button type="button" className="secondary-light" onClick={() => onNavigate('billing')}>
               Abrir financeiro
             </button>
           </section>
@@ -410,19 +409,19 @@ export default function AdminPanel({ onOpenSecurity }) {
               <span className="admin-security-index">02 / Dados</span>
               <h3>Privacidade</h3>
               <p>Analise pedidos registrados sem abrir as fichas dos alunos. A exclusão definitiva ainda não foi implementada.</p>
-              <button type="button" className="secondary-light" onClick={() => setView('privacy')}>Ver solicitações</button>
+              <button type="button" className="secondary-light" onClick={() => onNavigate('privacy')}>Ver solicitações</button>
             </article>
             <article className="card admin-security-card">
               <span className="admin-security-index">03 / Registros</span>
               <h3>Auditoria administrativa</h3>
               <p>Consulte as últimas alterações administrativas registradas, com autor e horário.</p>
-              <button type="button" className="secondary-light" onClick={() => setView('audit')}>Consultar histórico</button>
+              <button type="button" className="secondary-light" onClick={() => onNavigate('audit')}>Consultar histórico</button>
             </article>
             <article className="card admin-security-card">
               <span className="admin-security-index">04 / Integridade</span>
               <h3>Atualizações verificadas</h3>
               <p>Acompanhe o fluxo existente de atualizações por ZIP assinado, quando configurado no servidor.</p>
-              <button type="button" className="secondary-light" onClick={() => setView('updates')}>Gerenciar versões</button>
+              <button type="button" className="secondary-light" onClick={() => onNavigate('updates')}>Gerenciar versões</button>
             </article>
           </div>
         </div>
