@@ -11,6 +11,16 @@ Plataforma para profissionais de educação física organizarem alunos, turmas e
 - **Banco:** PostgreSQL
 - **Desenvolvimento local:** Docker Compose
 
+## Áreas da interface (primeira revisão visual)
+
+A interface autenticada é organizada por função, preservando as permissões verificadas pela API:
+
+- **Professor:** ambiente de trabalho para alunos, biblioteca de exercícios, turmas, presença, relatórios e Pix de teste.
+- **Administrador:** ambiente próprio com menu lateral agrupado em Gestão, Financeiro, Proteção e Dados e Sistema. O painel inicial resume os indicadores sem exibir fichas individuais.
+- **Conta e segurança:** acesso separado pelo cabeçalho para alteração de senha (encerra as sessões). Administradores também têm uma central para abrir a triagem de privacidade, a auditoria administrativa e as atualizações assinadas já existentes.
+
+A separação visual **não substitui a autorização no backend**, que continua validando os papéis. A central de segurança não introduz autenticação de dois fatores nem exclusão definitiva de dados.
+
 ## Instalação pelo aaPanel (Node.js, sem Docker)
 
 O G-Fit agora tem um **instalador visual** para aaPanel, no mesmo estilo dos projetos Node.js: abra o domínio HTTPS mapeado, digite o **código exibido no log do Node.js Project**, configure PostgreSQL e defina a primeira conta administrativa. Ele instala as dependências, compila React, aplica as migrações e inicia a API. Após a instalação, a mesma aplicação serve o React e a API; não é necessário publicar portas internas.
