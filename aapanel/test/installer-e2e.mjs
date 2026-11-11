@@ -14,7 +14,7 @@ const privateDir=await fs.mkdtemp(path.join(os.tmpdir(),'gfit-aapanel-e2e-'));
 // Simulate aaPanel service accounts with no valid HOME directory.
 const inaccessibleHome=path.join(privateDir,'nonexistent-service-home');
 const signing=createKeyPair();
-await fs.writeFile(path.join(privateDir,'trusted-release-key.pem'),signing.publicPem,{mode:0o600});
+// A fresh instance starts without a configured public release key.
 // Other applications on the same VPS may occupy legacy G-Fit ports.
 const occupied=[];
 for(const port of [3001,3333]){
@@ -82,12 +82,22 @@ try{
     ...proxyHeaders,'Sec-Fetch-Site':'cross-site',
   })).status,403);
   assert.equal((await request('/setup/status',{code})).data.installed,false);
+  const invalid=await request('/setup/install',{
+    code, dbHost:'127.0.0.1', dbPort:15432, dbName:'gfit_install',
+    dbUser:'gfit_install', dbPassword:'ci_aapanel_database_password',
+    adminEmail:'admin-install@example.com',
+    adminPassword:'ci-admin-initial-password',
+    adminConfirm:'ci-admin-initial-password',
+    releasePublicKey:'invalid-key',
+  });
+  assert.equal(invalid.status,400,'malformed release key must fail');
   const start=await request('/setup/install',{
     code,dbHost:'127.0.0.1',dbPort:15432,dbName:'gfit_install',
     dbUser:'gfit_install',dbPassword:'ci_aapanel_database_password',
     adminEmail:'admin-install@example.com',
     adminPassword:'ci-admin-initial-password',
     adminConfirm:'ci-admin-initial-password',
+    releasePublicKey:signing.publicPem,
   });
   assert.equal(start.status,202,JSON.stringify(start.data));
   let installed=false;
@@ -154,6 +164,9 @@ try{
   assert.equal((await fs.stat(path.join(privateDir,'npm-home'))).isDirectory(),true);
   assert.equal((await fs.stat(path.join(privateDir,'npm-cache'))).isDirectory(),true);
   assert.equal(await fs.stat(inaccessibleHome).then(()=>true,()=>false),false);
+  const trusted=await fs.readFile(path.join(privateDir,'trusted-release-key.pem'),'utf8');
+  assert.equal(trusted,signing.publicPem,'setup must trust the provided public key');
+  assert.equal((await fs.stat(path.join(privateDir,'trusted-release-key.pem'))).mode&0o077,0);
   const config=await fs.readFile(path.join(privateDir,'instance.env'),'utf8');
   assert.ok(config.includes('BIND_HOST="127.0.0.1"'));
   assert.ok(config.includes('COOKIE_SECURE="true"'));
