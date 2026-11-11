@@ -29,11 +29,16 @@ export default function AccountPanel({ onPasswordChanged }) {
     finally { setBusy(false); }
   }
   return (
-    <section className="stack">
-      <div><div className="eyebrow">Segurança</div><h1>Minha conta</h1></div>
-      <div className="card auth-card-wide">
-        <h2>Alterar senha</h2>
-        <p className="muted">Depois da troca, todas as sessões serão encerradas. Entre novamente com a senha nova.</p>
+    <section className="stack account-security">
+      <div className="account-security-heading">
+        <div className="eyebrow">Área pessoal / Segurança</div>
+        <h1>Conta e segurança</h1>
+        <p className="muted">Gerencie a proteção do seu acesso sem misturá-la às atividades do professor ou às configurações administrativas.</p>
+      </div>
+      <div className="account-security-layout">
+        <div className="card auth-card-wide">
+          <h2>Alterar senha</h2>
+          <p className="muted">Depois da troca, todas as sessões serão encerradas. Entre novamente com a nova senha.</p>
         <form onSubmit={submit}>
           <label>Senha atual
             <input type="password" autoComplete="current-password" required
@@ -50,6 +55,17 @@ export default function AccountPanel({ onPasswordChanged }) {
           {error && <p className="error" role="alert">{error}</p>}
           <button className="primary" disabled={busy}>Salvar nova senha</button>
         </form>
+        </div>
+        <aside className="card security-guide">
+          <div className="eyebrow">Cuidados com sua conta</div>
+          <h2>Segurança de acesso</h2>
+          <ul>
+            <li>Use uma senha longa e exclusiva para o G-Fit.</li>
+            <li>A alteração da senha encerra as sessões já abertas.</li>
+            <li>Não compartilhe dados de acesso com outros usuários.</li>
+            <li>Autenticação em dois fatores ainda não está disponível.</li>
+          </ul>
+        </aside>
       </div>
     </section>
   );
