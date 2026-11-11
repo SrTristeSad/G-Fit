@@ -114,6 +114,14 @@ try{
   const html=await app.text();
   assert.ok(html.includes('id="root"'),'must serve built React app');
   assert.ok(!html.includes('CÓDIGO DE INSTALAÇÃO'));
+  // aaPanel must serve the SPA for direct navigation and browser refresh
+  // in both independent, role-checked workspaces.
+  for(const route of ['/admin','/admin/professores','/admin/seguranca',
+    '/professor','/professor/exercicios','/professor/conta']){
+    const deepLink=await fetch(base+route);
+    assert.equal(deepLink.status,200,'SPA deep link: '+route);
+    assert.ok((await deepLink.text()).includes('id="root"'),route);
+  }
   assert.equal((await fetch(base+'/setup')).status,404);
   assert.equal((await request('/setup/install',{code})).status,404);
   const login=await fetch(base+'/api/auth/login',{
