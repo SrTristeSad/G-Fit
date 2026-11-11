@@ -3,7 +3,7 @@
 import http from 'node:http';
 import {spawn} from 'node:child_process';
 import {randomInt,timingSafeEqual,createHash,randomBytes} from 'node:crypto';
-import {promises as fs,createReadStream} from 'node:fs';
+import {promises as fs,createReadStream,constants as fsConstants} from 'node:fs';
 import path from 'node:path';
 import {homedir} from 'node:os';
 import {isIP} from 'node:net';
@@ -157,30 +157,83 @@ async function exists(filename){
   try{await fs.access(filename);return true;}
   catch(error){if(error.code==='ENOENT')return false;throw error;}
 }
+// The aaPanel "www" service account may have no usable home directory or
+// may share an npm cache previously populated by root. Keep npm entirely in
+// G-Fit's private, writable directory, outside the publicly served files.
+async function npmEnvironment(){
+  const npmHome=path.join(privateDir,'npm-home');
+  const npmCache=path.join(privateDir,'npm-cache');
+  for(const dir of [npmHome,npmCache]){
+    await fs.mkdir(dir,{recursive:true,mode:0o700});
+    await fs.access(dir,fsConstants.W_OK|fsConstants.X_OK);
+  }
+  return {
+    ...process.env,HOME:npmHome,npm_config_cache:npmCache,
+    npm_config_update_notifier:'false',
+  };
+}
+async function assertProjectWritable(folder,subdirs=['node_modules']){
+  const label=path.basename(folder);
+  for(const dir of [folder,...subdirs.map(name=>path.join(folder,name))]){
+    try{
+      const st=await fs.lstat(dir);
+      if(!st.isDirectory())throw new Error('A pasta '+path.relative(root,dir)+' não é um diretório.');
+      await fs.access(dir,fsConstants.W_OK|fsConstants.X_OK);
+    }catch(error){
+      if(error.code==='ENOENT'&&dir!==folder)continue;
+      if(['EACCES','EPERM','EROFS'].includes(error.code)){
+        throw new Error('Sem permissão de escrita em '+path.relative(root,dir)+'. '+
+          'O usuário do Node.js Project precisa escrever nas pastas api/ e web/ do G-Fit. '+
+          'Corrija as permissões somente desta instalação no aaPanel, sem executar npm com sudo.');
+      }
+      throw error;
+    }
+  }
+}
+function npmFailureHint(code,output){
+  if(code===243||/EACCES|EPERM|permission denied|operation not permitted/i.test(output)){
+    return 'Possível erro de permissão do usuário Node.js do aaPanel (frequentemente www). '+
+      'Verifique a propriedade e gravação das pastas api/, web/ e node_modules/ do G-Fit. '+
+      'O instalador utiliza um cache npm privado; não execute npm com sudo.';
+  }
+  if(/ENOSPC|no space left on device/i.test(output)){
+    return 'Disco sem espaço disponível. Verifique o armazenamento da VPS.';
+  }
+  if(/EAI_AGAIN|ENOTFOUND|ECONNRESET|ETIMEDOUT|ECONNREFUSED|FETCH_ERROR/i.test(output)){
+    return 'Falha ao acessar o registro de pacotes npm. Verifique DNS, rede e proxy do servidor.';
+  }
+  if(/EINTEGRITY|EUSAGE|ERESOLVE/i.test(output)){
+    return 'O npm rejeitou a instalação. Confira o lockfile e o log do aaPanel.';
+  }
+  return 'Consulte o erro detalhado do npm no log do aaPanel; verifique a versão Node, permissões e rede.';
+}
 async function exec(command,args,cwd,env=process.env){
   const child=spawn(command,args,{cwd,env,stdio:['ignore','pipe','pipe'],windowsHide:true});
   let errorOutput='';
-  child.stderr.on('data',part=>{errorOutput=(errorOutput+String(part)).slice(-1000);});
-  // Draining stdout prevents hung npm/Node subprocesses; never copy secrets to UI.
-  child.stdout.resume();
+  let outputTail='';
+  child.stderr.on('data',part=>{errorOutput=(errorOutput+String(part)).slice(-2000);});
+  // Preserve only the tail for classification; never send raw subprocess output
+  // to the browser (the provisioning process may contain secrets).
+  child.stdout.on('data',part=>{outputTail=(outputTail+String(part)).slice(-2000);});
   const exit=await new Promise((resolve,reject)=>{
     child.once('error',reject);
     child.once('exit',code=>resolve(code));
   });
   if(exit!==0){
     const hint=command==='npm'?
-      'Verifique a versão Node, npm, permissões e conexão de rede no log do aaPanel.':
+      npmFailureHint(exit,errorOutput+'\n'+outputTail):
       'Verifique as credenciais do PostgreSQL e o log do processo no aaPanel.';
-    console.error('Erro em '+command+' ('+exit+'): '+errorOutput.slice(-600));
-    throw new Error('Falha ao executar '+command+' (código '+exit+'). '+hint);
+    console.error('Erro em '+path.basename(command)+' ('+exit+') na etapa '+state.phase+': '+errorOutput.slice(-600));
+    throw new Error('Falha ao executar '+path.basename(command)+' (código '+exit+') na etapa '+state.phase+'. '+hint);
   }
 }
 async function installDependencies(folder,includeDev){
   if(!await exists(path.join(folder,'package-lock.json'))){
     throw new Error('package-lock.json ausente em '+path.basename(folder)+'. Instale somente pacotes completos e versionados.');
   }
+  await assertProjectWritable(folder);
   await exec('npm',['ci','--ignore-scripts',includeDev?'--include=dev':'--omit=dev',
-    '--no-audit','--no-fund'],folder);
+    '--no-audit','--no-fund'],folder,await npmEnvironment());
 }
 async function waitApiReady(child){
   // A API pede uma porta livre ao sistema operacional (PORT=0). O número
@@ -255,7 +308,8 @@ async function install(input){
   state.phase='Instalando dependências do React';
   await installDependencies(webDir,true);
   state.phase='Compilando interface React';
-  await exec('npm',['run','build'],webDir);
+  await assertProjectWritable(webDir,['node_modules','dist']);
+  await exec('npm',['run','build'],webDir,await npmEnvironment());
   const env={};
   for(const key of ['DB_HOST','DB_PORT','DB_USER','DB_NAME','DB_PASSWORD']){
     env[key]=input[key];
