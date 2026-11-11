@@ -219,8 +219,8 @@ try{
   }
   let status=await updateStatus();
   assert.equal(status.supported,true);
-  assert.equal(status.currentVersion,'0.1.0');
-  const zip=makeReleaseZip(await collectReleaseFiles(process.cwd()),'0.1.1',signing.privatePem);
+  assert.equal(status.currentVersion,'0.3.0');
+  const zip=makeReleaseZip(await collectReleaseFiles(process.cwd()),'0.3.1',signing.privatePem);
   async function upload(content,pwd='ci-admin-initial-password'){
     const response=await fetch(statusUrl+'/upload',{
       method:'POST',
@@ -235,7 +235,7 @@ try{
   corrupt[40]^=0x80;
   assert.equal((await upload(corrupt)).status,400);
   const attackerKey=createKeyPair();
-  const attackerZip=makeReleaseZip(await collectReleaseFiles(process.cwd()),'0.1.1',attackerKey.privatePem);
+  const attackerZip=makeReleaseZip(await collectReleaseFiles(process.cwd()),'0.3.1',attackerKey.privatePem);
   assert.equal((await upload(attackerZip.buffer)).status,400);
 
   const accept=await upload(zip.buffer);
@@ -253,7 +253,7 @@ try{
     if(restarted.exitCode!==null)throw new Error('Launcher exited during ZIP staging: '+restartLog.slice(-2000));
   }
   assert.ok(prepared,'ZIP preparation did not finish: '+JSON.stringify(status.pending));
-  assert.equal(status.currentVersion,'0.1.0','preparation may not activate files');
+  assert.equal(status.currentVersion,'0.3.0','preparation may not activate files');
   const badApply=await fetch(statusUrl+'/apply',{
     method:'POST',headers:{...adminHeaders,'Content-Type':'application/json'},
     body:JSON.stringify({id:status.pending.id,confirmation:'INDEVIDO'}),
@@ -280,8 +280,8 @@ try{
     if(restarted.exitCode!==null)throw new Error('aaPanel supervisor unexpectedly stopped.');
   }
   assert.ok(applied,'ZIP activation did not complete: '+JSON.stringify(status.pending));
-  assert.equal(status.currentVersion,'0.1.1');
-  assert.equal(status.history[0].version,'0.1.1');
+  assert.equal(status.currentVersion,'0.3.1');
+  assert.equal(status.history[0].version,'0.3.1');
   assert.equal(status.pending.restartRequired,true);
 
   const backupDir=path.join(privateDir,'updates','snapshots',status.pending.id);
@@ -332,7 +332,7 @@ try{
     if(finalRun.exitCode!==null)break;
   }
   assert.ok(finalReady,'ZIP-restarted service not ready: '+finalOutput.slice(-1200));
-  assert.equal((await updateStatus()).currentVersion,'0.1.1');
+  assert.equal((await updateStatus()).currentVersion,'0.3.1');
   assert.equal(finalOutput.includes('CÓDIGO DE INSTALAÇÃO:'),false);
   console.log('aaPanel ZIP: upload, staging, db backup, apply, code restart, version and admin persistence OK');
 
