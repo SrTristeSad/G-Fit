@@ -28,8 +28,8 @@ No aaPanel, use **Website → Node.js Project → Add Project → Default Projec
 | Diretório / Path | `/www/wwwroot/G-Fit` (ou outra pasta com o repositório) |
 | Node.js runtime | **22** |
 | Run User | **www** (recomendado pelo aaPanel) |
-| Start command | **`npm start -- --port=3344`** (exemplo; utilize a mesma porta configurada abaixo) |
-| Project Port | **3344** (exemplo; escolha uma porta livre, diferente das dos outros projetos) |
+| Start command | **`npm run aapanel`** (usa `3344` por padrão, sem argumento) |
+| Project Port | **3344** (deve corresponder à porta usada pelo G-Fit) |
 | Install dependencies | **Desativado**: o instalador gerencia esse passo |
 | Mapping | **Ativado**, apontando o domínio para o projeto |
 | SSL | **Ativado antes de preencher o formulário de instalação** |
@@ -50,13 +50,15 @@ O usuário escolhido no aaPanel deve ter **permissão de leitura e gravação no
 A porta externa é configurável por variável de ambiente ou argumento do inicializador:
 
 ```bash
-# Prioridade: --port > GFIT_PORT > PORT > padrão 3333
-npm start -- --port=3344
+# Prioridade: --port > GFIT_PORT > PORT > padrão 3344
+npm run aapanel
+# Para escolher outra porta sem modificar o código:
+npm start -- --port=3456
 # Ou, se o aaPanel fornecer PORT no ambiente:
 PORT=3344 npm start
 ```
 
-O campo **Project Port** do aaPanel deve ser igual à porta realmente usada pelo G-Fit. O aaPanel não garante que o campo seja automaticamente disponibilizado na variável de ambiente `PORT`; por isso, a maneira mais previsível é selecionar um **Custom Start Command** com `npm start -- --port=3344` e preencher `3344` em **Project Port**. Para mudar de porta no futuro, altere **somente esses dois valores nas configurações do aaPanel**, sem editar nenhum arquivo JavaScript. O servidor informa no log qual porta está usando.
+O campo **Project Port** do aaPanel deve ser igual à porta realmente usada pelo G-Fit. A configuração padrão funciona com **`npm run aapanel`** e **Project Port `3344`**, sem edição do código e sem argumento no comando. O aaPanel não garante que o campo Project Port seja automaticamente passado à aplicação como variável `PORT`. Para usar outra porta livre, configure **Custom Start Command** como `npm start -- --port=3456` e **Project Port** como `3456` (substitua ambos pelo mesmo número). O servidor informa no log a porta utilizada. **Não existe troca automática da porta pública sem atualizar o Mapping do aaPanel**: isso poderia gerar erro 502.
 
 A porta **interna** da API é sempre escolhida pelo sistema operacional, independentemente da `PORT` externa. Assim, outros projetos podem continuar usando `3001` e `3333` sem colidir com essa API. **Não ative escolha aleatória para a porta externa:** isso quebraria o proxy, porque o Mapping continuaria apontando para o número anterior.
 
@@ -158,7 +160,7 @@ Os comandos em `scripts/backup.mjs` e `scripts/restore-check.mjs` foram escritos
 
 ## Diagnóstico
 
-- **502 no domínio:** confira se a aplicação está em execução e se **Project Port, Mapping e `--port`** apontam para a **mesma porta** (exemplo: `3344`). Verifique os logs do projeto.
+- **502 no domínio:** confira se a aplicação está em execução e se **Project Port, Mapping e a porta efetiva** apontam para a **mesma porta** (padrão `3344`, ou o valor escolhido em `--port`). Verifique os logs do projeto.
 - **`node: command not found` ou versão errada:** escolha Node.js 22 em **Node version manager → Command line ver**, ou no runtime do Node.js Project.
 - **Falha ao instalar dependências:** confirme acesso à internet, permissões da pasta e saída do processo. O instalador exige lockfile válido e usa somente `npm ci --ignore-scripts`.
 - **Assinatura não configurada:** gere o par Ed25519 fora do repositório, copie somente a chave pública e execute `node scripts/trust-release-key.mjs` na VPS, com o usuário do projeto.
