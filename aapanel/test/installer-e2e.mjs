@@ -65,6 +65,17 @@ try{
   assert.equal((await request('/setup/status',{code:'0000000X'})).status,403);
   // Cross-origin setup requests are rejected even with the correct code.
   assert.equal((await request('/setup/status',{code},{Origin:'http://example.test'})).status,403);
+  // aaPanel may rewrite the upstream Host to loopback while the browser sends
+  // the real HTTPS Origin and same-origin Fetch Metadata.
+  const proxyHeaders={
+    Origin:'https://livro.snulog.shop',
+    'X-Forwarded-Proto':'https',
+    'Sec-Fetch-Site':'same-origin',
+  };
+  assert.equal((await request('/setup/status',{code},proxyHeaders)).status,200);
+  assert.equal((await request('/setup/status',{code},{
+    ...proxyHeaders,'Sec-Fetch-Site':'cross-site',
+  })).status,403);
   assert.equal((await request('/setup/status',{code})).data.installed,false);
   const start=await request('/setup/install',{
     code,dbHost:'127.0.0.1',dbPort:15432,dbName:'gfit_install',
