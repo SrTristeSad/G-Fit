@@ -64,6 +64,31 @@ export function isSecureInstallerRequest(req) {
   return (!forwarded || forwarded==='http') &&
     /^(localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/.test(host);
 }
+// Resolves the aaPanel project listener without requiring source edits.
+// Explicit launcher flag > GFIT_PORT > platform PORT > legacy default.
+// The aaPanel Mapping target must use this same public port.
+export function resolvePublicPort({argv=[],env={}}={}){
+  const flags=argv.filter(x=>x==='--port'||x.startsWith('--port='));
+  let cli=null;
+  if(flags.length>1)throw new Error('Informe apenas uma opção --port.');
+  if(flags[0]==='--port'){
+    const index=argv.indexOf('--port');
+    cli=argv[index+1];
+    if(cli==null||cli.startsWith('-'))throw new Error('Informe um número após --port.');
+  }else if(flags.length){
+    cli=flags[0].slice('--port='.length);
+  }
+  const raw=cli ?? env.GFIT_PORT ?? env.PORT ?? '3333';
+  if(typeof raw!=='string'&&typeof raw!=='number')throw new Error('Porta inválida.');
+  const value=String(raw);
+  if(!/^\\d{1,5}$/.test(value))throw new Error('Porta inválida: use um número entre 1024 e 65535.');
+  const port=Number(value);
+  if(!Number.isSafeInteger(port)||port<1024||port>65535){
+    throw new Error('Porta inválida: use um número entre 1024 e 65535.');
+  }
+  return port;
+}
+
 export function installCodeMatches(input,code,timingSafeEqualFn) {
   if(typeof input!=='string' || !/^\d{8}$/.test(input))return false;
   return timingSafeEqualFn(Buffer.from(input),Buffer.from(code));
