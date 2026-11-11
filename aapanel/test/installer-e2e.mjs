@@ -180,6 +180,11 @@ try{
   launcher.kill('SIGTERM');
   for(let i=0;i<60&&launcher.exitCode===null;i++)await pause(100);
   assert.notEqual(launcher.exitCode,null,'launcher did not terminate gracefully');
+  // Simulate extracting the source-only deployment ZIP over an existing aaPanel
+  // instance: its database configuration survives but node_modules is incomplete.
+  const missingModule=path.join(process.cwd(),'api','node_modules','cookie-parser');
+  await fs.rm(missingModule,{recursive:true,force:true});
+  assert.equal(await fs.stat(missingModule).then(()=>true,()=>false),false);
   restarted=spawn(process.execPath,['aapanel/launcher.mjs','--port=3339'],{
     cwd:process.cwd(),
     env:{...process.env,GFIT_PORT:'3338',PORT:'3337',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
@@ -196,6 +201,10 @@ try{
     if(restarted.exitCode!==null)break;
   }
   assert.equal(reopened,true,'failed to relaunch installed aaPanel app: '+restartLog.slice(-1200));
+  assert.equal((await fs.stat(missingModule)).isDirectory(),true,
+    'launcher must reinstall missing runtime packages before starting the API');
+  assert.ok(restartLog.includes('dependências da API restauradas'),
+    'the repair must be visible in the aaPanel log');
   assert.equal((await fetch(base+'/setup')).status,404);
   assert.equal(restartLog.includes('CÓDIGO DE INSTALAÇÃO:'),false);
   console.log('aaPanel: instalação única, segredos externos, reinício e recuperação de serviço OK');
