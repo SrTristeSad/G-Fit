@@ -1,8 +1,25 @@
-// Helpers without dependencies; shared by aaPanel installer and its tests.
+// Shared setup validation. Only a public signing key may enter the server.
+import {createPublicKey} from 'node:crypto';
 export const DB_KEYS = ['DB_HOST','DB_PORT','DB_NAME','DB_USER','DB_PASSWORD'];
+
+// Accept only a compact Ed25519 SPKI public key. Never import private-key
+// material from the setup request, and normalize before writing to disk.
+export function normalizeReleasePublicKey(value) {
+  if(typeof value !== 'string' || value.length > 512 ||
+      !value.includes('-----BEGIN PUBLIC KEY-----') ||
+      value.includes('PRIVATE KEY'))return null;
+  try {
+    const key=createPublicKey(value);
+    if(key.asymmetricKeyType!=='ed25519')return null;
+    const encoded=key.export({type:'spki',format:'pem'});
+    if(!/^-----BEGIN PUBLIC KEY-----\n[A-Za-z0-9+/=\n]+-----END PUBLIC KEY-----\n$/.test(encoded))return null;
+    return encoded;
+  }catch{return null;}
+}
 export function validateSetup(value) {
   if(!value || typeof value !== 'object' || Array.isArray(value))return null;
-  const {dbHost, dbPort, dbName, dbUser, dbPassword,adminEmail,adminPassword,adminConfirm}=value;
+  const {dbHost, dbPort, dbName, dbUser, dbPassword,adminEmail,adminPassword,adminConfirm,releasePublicKey}=value;
+  const verifiedPublicKey=normalizeReleasePublicKey(releasePublicKey);
   if(typeof dbHost!=='string'||dbHost.length>255||
     !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(dbHost) ||
     dbHost.includes('..') ||
@@ -14,11 +31,12 @@ export function validateSetup(value) {
     typeof adminEmail!=='string'||adminEmail.length>254||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail) ||
     typeof adminPassword!=='string'||adminPassword.length<10||adminPassword.length>128||
-    adminPassword!==adminConfirm) return null;
+    adminPassword!==adminConfirm || !verifiedPublicKey) return null;
   return {
     DB_HOST:dbHost,DB_PORT:String(Number(dbPort)),DB_NAME:dbName,
     DB_USER:dbUser,DB_PASSWORD:dbPassword,
     adminEmail:adminEmail.toLowerCase().trim(),adminPassword,
+    releasePublicKey:verifiedPublicKey,
   };
 }
 export function formatEnv(settings) {
