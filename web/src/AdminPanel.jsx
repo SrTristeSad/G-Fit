@@ -8,9 +8,43 @@ import AdminAlerts from './AdminAlerts.jsx';
 import PrivacyRequestsAdmin from './PrivacyRequestsAdmin.jsx';
 import SystemUpdates from './SystemUpdates.jsx';
 
-function Stat({ label, value, caption }) {
+const ADMIN_MENU = [
+  { title: 'Painel', items: [{ id: 'overview', label: 'Visão geral' }] },
+  { title: 'Gestão', items: [
+    { id: 'teachers', label: 'Professores' },
+    { id: 'plans', label: 'Planos' },
+    { id: 'access', label: 'Vigências' },
+  ] },
+  { title: 'Financeiro', items: [
+    { id: 'billing', label: 'Cobranças (teste)' },
+    { id: 'operations', label: 'Monitoramento' },
+    { id: 'alerts', label: 'Alertas' },
+  ] },
+  { title: 'Proteção e dados', items: [
+    { id: 'security', label: 'Segurança' },
+    { id: 'privacy', label: 'Privacidade' },
+    { id: 'audit', label: 'Auditoria' },
+  ] },
+  { title: 'Sistema', items: [{ id: 'updates', label: 'Atualizações' }] },
+];
+
+const VIEW_TITLES = {
+  overview: ['Visão geral', 'Acompanhe os indicadores essenciais da plataforma.'],
+  teachers: ['Professores', 'Gerencie contas, limites e planos de acesso.'],
+  plans: ['Planos comerciais', 'Organize planos e seus limites.'],
+  access: ['Vigências', 'Controle os prazos administrativos de acesso.'],
+  billing: ['Cobranças de teste', 'Acompanhe os pagamentos apenas no ambiente de simulação.'],
+  operations: ['Monitoramento financeiro', 'Conciliação e eventos do Asaas Sandbox.'],
+  alerts: ['Alertas', 'Acompanhe situações que exigem atenção.'],
+  security: ['Central de segurança', 'Controles de conta, privacidade e rastreabilidade.'],
+  privacy: ['Privacidade', 'Triagem de solicitações e responsabilidades de proteção de dados.'],
+  audit: ['Auditoria', 'Histórico administrativo de alterações registradas.'],
+  updates: ['Atualizações', 'Gerencie versões assinadas do G-Fit.'],
+};
+
+function Stat({ label, value, caption, featured = false }) {
   return (
-    <div className="admin-stat">
+    <div className={featured ? 'admin-stat admin-stat-featured' : 'admin-stat'}>
       <span>{label}</span>
       <strong>{value}</strong>
       {caption && <small>{caption}</small>}
@@ -190,7 +224,7 @@ function AuditList({ events }) {
   );
 }
 
-export default function AdminPanel() {
+export default function AdminPanel({ onOpenSecurity }) {
   const [teachers, setTeachers] = useState([]);
   const [plans, setPlans] = useState([]);
   const [accessTerms, setAccessTerms] = useState([]);
@@ -247,94 +281,151 @@ export default function AdminPanel() {
     finally { setLoading(false); }
   }
 
+  const title = VIEW_TITLES[view] || VIEW_TITLES.overview;
   return (
-    <section className="stack">
-      <div className="section-heading">
-        <div>
-          <div className="eyebrow">Administração do G Fit</div>
-          <h1>Controle da plataforma</h1>
+    <section className="admin-shell">
+      <aside className="admin-sidebar">
+        <div className="admin-sidebar-head">
+          <span className="admin-sidebar-mark">G</span>
+          <div>
+            <strong>G Fit</strong>
+            <small>Área administrativa</small>
+          </div>
         </div>
-        <button className="secondary-light" disabled={loading} onClick={reload}>Atualizar dados</button>
-      </div>
-      <nav aria-label="Seções administrativas" className="admin-tabs">
-        <button className={view === 'overview' ? 'active' : ''} onClick={() => setView('overview')}>
-          Visão geral
-        </button>
-        <button className={view === 'teachers' ? 'active' : ''} onClick={() => setView('teachers')}>
-          Professores
-        </button>
-        <button className={view === 'plans' ? 'active' : ''} onClick={() => setView('plans')}>
-          Planos
-        </button>
-        <button className={view === 'access' ? 'active' : ''} onClick={() => setView('access')}>
-          Vigências
-        </button>
-        <button className={view === 'billing' ? 'active' : ''} onClick={() => setView('billing')}>
-          Financeiro (teste)
-        </button>
-        <button className={view === 'operations' ? 'active' : ''} onClick={() => setView('operations')}>
-          Monitoramento
-        </button>
-        <button className={view === 'alerts' ? 'active' : ''} onClick={() => setView('alerts')}>
-          Alertas{alertsSummary.open > 0 ? ' (' + alertsSummary.open + ')' : ''}
-        </button>
-        <button className={view === 'privacy' ? 'active' : ''} onClick={() => setView('privacy')}>
-          Privacidade
-        </button>
-        <button className={view === 'updates' ? 'active' : ''} onClick={() => setView('updates')}>
-          Atualizações
-        </button>
-        <button className={view === 'audit' ? 'active' : ''} onClick={() => setView('audit')}>
-          Histórico
-        </button>
-      </nav>
+        <nav aria-label="Navegação administrativa" className="admin-side-nav">
+          {ADMIN_MENU.map(group => (
+            <div className="admin-nav-group" key={group.title}>
+              <span className="admin-nav-label">{group.title}</span>
+              {group.items.map(item => (
+                <button key={item.id} type="button"
+                  className={view === item.id ? 'active' : ''}
+                  aria-current={view === item.id ? 'page' : undefined}
+                  onClick={() => setView(item.id)}>
+                  <span>{item.label}</span>
+                  {item.id === 'alerts' && alertsSummary.open > 0 &&
+                    <span className="admin-nav-count">{alertsSummary.open}</span>}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <p className="admin-sidebar-note">A gestão da plataforma é separada das fichas individuais dos alunos.</p>
+      </aside>
+      <div className="admin-main stack">
+        <div className="admin-main-heading">
+          <div>
+            <div className="eyebrow">Administração / {title[0]}</div>
+            <h1>{title[0]}</h1>
+            <p className="muted">{title[1]}</p>
+          </div>
+          <button className="secondary-light" disabled={loading} onClick={reload}>Atualizar dados</button>
+        </div>
       {error && <p role="alert" className="error">{error}</p>}
       {loading && <p className="muted">Atualizando informações…</p>}
       {view === 'overview' && (
-        <>
-          <div className="admin-stats">
-            <Stat label="Professores ativos" value={overview?.teachersActive ?? '—'}
+        <div className="stack">
+          <div className="admin-overview-intro">
+            <div>
+              <div className="eyebrow">Resumo operacional</div>
+              <h2>O que está acontecendo no G Fit</h2>
+              <p className="muted">Indicadores agregados, sem exposição de fichas individuais.</p>
+            </div>
+            <button type="button" className="secondary-light" onClick={() => setView('teachers')}>
+              Gerenciar professores
+            </button>
+          </div>
+          <div className="admin-stats admin-stats-primary">
+            <Stat featured label="Professores ativos" value={overview?.teachersActive ?? '—'}
               caption={overview ? overview.teachersTotal + ' cadastrados' : ''} />
-            <Stat label="Professores suspensos" value={overview?.teachersInactive ?? '—'} />
-            <Stat label="Alunos ativos" value={overview?.studentsActive ?? '—'}
+            <Stat featured label="Alunos ativos" value={overview?.studentsActive ?? '—'}
               caption={overview ? overview.studentsArchived + ' arquivados' : ''} />
-            <Stat label="Atividades atribuídas" value={overview?.exercisesAssigned ?? '—'} />
-            <Stat label="Realizações registradas" value={overview?.completionsLogged ?? '—'} />
-            <Stat label="Turmas ativas" value={overview?.classesActive ?? '—'}
+            <Stat featured label="Turmas ativas" value={overview?.classesActive ?? '—'}
               caption={overview ? overview.classesArchived + ' arquivadas' : ''} />
-            <Stat label="Aulas cadastradas" value={overview?.classSessions ?? '—'} />
-            <Stat label="Presenças manuais" value={overview?.attendancePresent ?? '—'}
-              caption={overview ? overview.attendanceAbsent + ' faltas registradas' : ''} />
-            <Stat label="Exportações de alunos" value={overview?.studentExportsTotal ?? '—'}
-              caption={overview ? overview.studentExportsLast30d + ' nos últimos 30 dias' : ''} />
-            <Stat label="Novos professores (30 dias)" value={overview?.teachersNew30d ?? '—'} />
-            <Stat label="Prazos ativos (manual)" value={overview?.manualAccessActive ?? '—'} />
-            <Stat label="Prazos vencidos (manual)" value={overview?.manualAccessExpired ?? '—'} />
-            <Stat label="Prazos agendados (manual)" value={overview?.manualAccessScheduled ?? '—'} />
-            <Stat label="Alertas abertos" value={alertsSummary.open ?? '—'} />
+            <Stat featured label="Alertas em aberto" value={alertsSummary.open ?? '—'}
+              caption={alertsSummary.open ? 'Acompanhar no financeiro' : 'Sem alertas abertos'} />
           </div>
-          <div className="columns">
-            <div className="card">
-              <h2>Atividade recente</h2>
-              <p className="muted">
-                Novos alunos nos últimos 30 dias:
-                <strong> {overview?.studentsNew30d ?? '—'}</strong>
-              </p>
-              <p className="muted">
-                A administração consulta números agregados, não os dados pessoais e
-                informações privadas das fichas dos alunos.
-              </p>
-            </div>
-            <div className="card">
-              <h2>Financeiro e assinaturas</h2>
+          <div className="admin-overview-columns">
+            <section className="card admin-summary-card">
+              <div className="section-heading">
+                <div>
+                  <h2>Atividade da plataforma</h2>
+                  <p className="muted">Registros operacionais e atividade recente.</p>
+                </div>
+              </div>
+              <dl className="admin-metric-list">
+                <div><dt>Atividades atribuídas</dt><dd>{overview?.exercisesAssigned ?? '—'}</dd></div>
+                <div><dt>Realizações registradas</dt><dd>{overview?.completionsLogged ?? '—'}</dd></div>
+                <div><dt>Aulas cadastradas</dt><dd>{overview?.classSessions ?? '—'}</dd></div>
+                <div><dt>Presenças manuais</dt><dd>{overview?.attendancePresent ?? '—'}</dd></div>
+                <div><dt>Faltas registradas</dt><dd>{overview?.attendanceAbsent ?? '—'}</dd></div>
+                <div><dt>Novos alunos (30 dias)</dt><dd>{overview?.studentsNew30d ?? '—'}</dd></div>
+                <div><dt>Exportações de alunos</dt><dd>{overview?.studentExportsTotal ?? '—'}</dd></div>
+                <div><dt>Exportações (30 dias)</dt><dd>{overview?.studentExportsLast30d ?? '—'}</dd></div>
+              </dl>
+            </section>
+            <section className="card admin-summary-card">
+              <h2>Contas e vigências</h2>
+              <p className="muted">Situação de acesso dos profissionais cadastrados.</p>
+              <dl className="admin-metric-list">
+                <div><dt>Professores suspensos</dt><dd>{overview?.teachersInactive ?? '—'}</dd></div>
+                <div><dt>Novos professores (30 dias)</dt><dd>{overview?.teachersNew30d ?? '—'}</dd></div>
+                <div><dt>Vigências ativas</dt><dd>{overview?.manualAccessActive ?? '—'}</dd></div>
+                <div><dt>Vigências vencidas</dt><dd>{overview?.manualAccessExpired ?? '—'}</dd></div>
+                <div><dt>Vigências agendadas</dt><dd>{overview?.manualAccessScheduled ?? '—'}</dd></div>
+              </dl>
+              <div className="admin-summary-actions">
+                <button type="button" className="secondary-light" onClick={() => setView('access')}>Ver vigências</button>
+              </div>
+            </section>
+          </div>
+          <section className="card admin-finance-brief">
+            <div>
+              <div className="eyebrow">Financeiro</div>
+              <h2>Ambiente de testes</h2>
               <p className="muted">{billing?.message || 'Sem dados financeiros disponíveis.'}</p>
-              <p className="notice">
-                O G Fit possui geração e conciliação de Pix apenas em sandbox. Não há faturamento real nem homologação para produção.
-                Entre em Financeiro (teste) para acessar as cobranças simuladas.
-              </p>
+              <small>Pix somente no Sandbox. Esta área não representa faturamento real.</small>
             </div>
+            <button type="button" className="secondary-light" onClick={() => setView('billing')}>
+              Abrir financeiro
+            </button>
+          </section>
+        </div>
+      )}
+      {view === 'security' && (
+        <div className="stack">
+          <div className="admin-security-intro">
+            <div className="eyebrow">Proteção e dados</div>
+            <h2>Segurança da plataforma</h2>
+            <p>Os controles disponíveis ficam organizados aqui. A existência desta área
+              não substitui a revisão de segurança, os processos de LGPD ou a gestão de backups.</p>
           </div>
-        </>
+          <div className="admin-security-grid">
+            <article className="card admin-security-card">
+              <span className="admin-security-index">01 / Conta</span>
+              <h3>Senha e sessões</h3>
+              <p>Altere a senha da sua conta administrativa. A troca encerra as sessões existentes.</p>
+              <button type="button" className="secondary-light" onClick={onOpenSecurity}>Abrir minha segurança</button>
+            </article>
+            <article className="card admin-security-card">
+              <span className="admin-security-index">02 / Dados</span>
+              <h3>Privacidade</h3>
+              <p>Analise pedidos registrados sem abrir as fichas dos alunos. A exclusão definitiva ainda não foi implementada.</p>
+              <button type="button" className="secondary-light" onClick={() => setView('privacy')}>Ver solicitações</button>
+            </article>
+            <article className="card admin-security-card">
+              <span className="admin-security-index">03 / Registros</span>
+              <h3>Auditoria administrativa</h3>
+              <p>Consulte as últimas alterações administrativas registradas, com autor e horário.</p>
+              <button type="button" className="secondary-light" onClick={() => setView('audit')}>Consultar histórico</button>
+            </article>
+            <article className="card admin-security-card">
+              <span className="admin-security-index">04 / Integridade</span>
+              <h3>Atualizações verificadas</h3>
+              <p>Acompanhe o fluxo existente de atualizações por ZIP assinado, quando configurado no servidor.</p>
+              <button type="button" className="secondary-light" onClick={() => setView('updates')}>Gerenciar versões</button>
+            </article>
+          </div>
+        </div>
       )}
       {view === 'teachers' && (
         <div className="card">
@@ -380,6 +471,7 @@ export default function AdminPanel() {
           <AuditList events={events} />
         </div>
       )}
+      </div>
     </section>
   );
 }
