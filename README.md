@@ -15,9 +15,11 @@ Plataforma para profissionais de educação física organizarem alunos, turmas e
 
 A interface autenticada é organizada por função, preservando as permissões verificadas pela API:
 
-- **Professor:** ambiente de trabalho para alunos, biblioteca de exercícios, turmas, presença, relatórios e Pix de teste.
-- **Administrador:** ambiente próprio com menu lateral agrupado em Gestão, Financeiro, Proteção e Dados e Sistema. O painel inicial resume os indicadores sem exibir fichas individuais.
-- **Conta e segurança:** acesso separado pelo cabeçalho para alteração de senha (encerra as sessões). Administradores também têm uma central para abrir a triagem de privacidade, a auditoria administrativa e as atualizações assinadas já existentes.
+- **Professor (`/professor`):** ambiente de trabalho para alunos, biblioteca de exercícios, turmas, presença, relatórios e Pix de teste. Seções têm links próprios, como `/professor/exercicios` e `/professor/conta`.
+- **Administrador (`/admin`):** ambiente próprio com menu lateral agrupado em Gestão, Financeiro, Proteção e Dados e Sistema. Seções têm links próprios, como `/admin/professores`, `/admin/seguranca` e `/admin/atualizacoes`. O painel inicial resume indicadores sem exibir fichas individuais.
+- **Conta e segurança:** o cabeçalho abre `/admin/conta` ou `/professor/conta`, conforme o papel. Alterar a senha encerra as sessões. Administradores também têm uma central para a triagem de privacidade, auditoria e atualizações assinadas.
+
+Após autenticação, o navegador usa a área correspondente à conta. Acesso cruzado por URL redireciona para a página inicial do próprio perfil. Os links funcionam ao atualizar ou abrir diretamente a página, tanto no aaPanel como no Nginx do Docker. A navegação usa o histórico do navegador (Voltar/Avançar) sem recarregar a aplicação.
 
 A separação visual **não substitui a autorização no backend**, que continua validando os papéis. A central de segurança não introduz autenticação de dois fatores nem exclusão definitiva de dados.
 
