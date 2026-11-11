@@ -41,6 +41,13 @@
     .error{background:#411e23;border-color:#ad6e74;color:#ffd0d1}
     .foot{font-size:12px;margin-top:22px;color:#89a995}
     .required{color:#b6f6bb}
+    .signing-setup{padding:17px 19px;border:1px solid #446954;border-radius:13px;background:#0c2016;margin:22px 0}
+    .signing-setup h3{margin:0 0 8px}
+    .signing-setup button{margin:11px 0 6px;background:#d5f9d9;min-height:44px}
+    .signing-setup .checkline{display:flex;align-items:flex-start;gap:10px;margin:16px 0 2px;line-height:1.5}
+    .signing-setup .checkline input{width:18px;height:18px;flex:0 0 18px;margin:1px 0 0}
+    .signing-setup .status{font-size:12px}
+    .fingerprint{font-family:ui-monospace,monospace;font-size:11px;overflow-wrap:anywhere;color:#c7e8cf}
     a{color:#abf4bb}
     @media(max-width:660px){.frame{padding:26px 14px}.grid,.row{grid-template-columns:1fr}.panel{padding:20px}header{margin-bottom:29px}h1{letter-spacing:-1.3px}}
   </style>
@@ -96,6 +103,19 @@
           <label>Confirmar senha
             <input id="adminConfirm" type="password" minlength="10" maxlength="128" required autocomplete="new-password"/>
           </label>
+        </div>
+        <div class="signing-setup">
+          <h3>Chave de segurança das atualizações</h3>
+          <p>Gere gratuitamente um par Ed25519 neste navegador. A chave <strong>privada</strong>
+            será baixada para o seu computador e nunca será enviada ao servidor. Só a chave
+            <strong> pública</strong> será instalada na VPS durante esta configuração inicial.</p>
+          <button type="button" id="generate-key">Gerar e baixar chave privada</button>
+          <button type="button" id="download-key" class="hidden">Baixar novamente a chave privada</button>
+          <p class="status hidden" id="key-status" role="status" aria-live="polite"></p>
+          <div class="fingerprint hidden" id="key-fingerprint"></div>
+          <label class="checkline"><input id="key-backed-up" type="checkbox" disabled required/>
+            <span>Confirmei que salvei a chave privada fora do servidor e guardarei uma cópia segura.
+            Sem ela não poderei assinar futuras atualizações.</span></label>
         </div>
         <div class="note">
           <p><strong>Segurança:</strong> use o domínio com certificado HTTPS antes de enviar senhas. O G-Fit permanece em protótipo, com Pix somente no Sandbox; não use dados reais de saúde nem cobranças reais.</p>
