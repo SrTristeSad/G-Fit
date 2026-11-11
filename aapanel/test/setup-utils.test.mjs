@@ -59,7 +59,9 @@ test('setup rejects plain HTTP mapped domains; allows local SSH tunnel and TLS m
 });
 
 test('aaPanel public port honors CLI, GFIT_PORT and standard PORT without source edits',()=>{
-  assert.equal(resolvePublicPort(),3333);
+  assert.equal(resolvePublicPort(),3344);
+  // A antiga porta permanece disponível quando escolhida explicitamente.
+  assert.equal(resolvePublicPort({argv:['--port=3333']}),3333);
   assert.equal(resolvePublicPort({env:{PORT:'3344'}}),3344);
   assert.equal(resolvePublicPort({env:{GFIT_PORT:'3355',PORT:'3344'}}),3355);
   assert.equal(resolvePublicPort({argv:['--port','3366'],env:{GFIT_PORT:'3355'}}),3366);
