@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {timingSafeEqual} from 'node:crypto';
+import {createKeyPair} from '../release-trust.mjs';
 import {
   validateSetup,formatEnv,parseEnv,
-  isSecureInstallerRequest,isAllowedInstallerOrigin,installCodeMatches,resolvePublicPort,
+  isSecureInstallerRequest,isAllowedInstallerOrigin,installCodeMatches,resolvePublicPort,normalizeReleasePublicKey,
 } from '../setup-utils.mjs';
 
+const signing=createKeyPair();
 const sample={
   dbHost:'127.0.0.1',dbPort:5432,dbName:'gfit',dbUser:'gfit',
   dbPassword:'db-secret-for-testing',adminEmail:'ADMIN@EXAMPLE.COM',
   adminPassword:'administrador-teste-123',adminConfirm:'administrador-teste-123',
+  releasePublicKey:signing.publicPem,
 };
 test('database and first admin validation rejects unsafe values',()=>{
   const normalized=validateSetup(sample);
@@ -25,11 +28,24 @@ test('database and first admin validation rejects unsafe values',()=>{
     {adminEmail:'not-an-email'},
     {adminPassword:'short',adminConfirm:'short'},
     {adminConfirm:'mismatched'},
+    {releasePublicKey:undefined},{releasePublicKey:'chave-invalida'},
+    {releasePublicKey:signing.privatePem},
   ]){
     assert.equal(validateSetup({...sample,...changes}),null);
   }
   assert.equal(validateSetup(null),null);
 });
+test('setup only accepts Ed25519 public keys and does not include private keys',()=>{
+  assert.equal(normalizeReleasePublicKey(signing.publicPem),signing.publicPem);
+  assert.equal(normalizeReleasePublicKey(signing.privatePem),null);
+  assert.equal(normalizeReleasePublicKey('not a key'),null);
+  assert.equal(normalizeReleasePublicKey('X'.repeat(513)),null);
+  const config=validateSetup(sample);
+  assert.equal(config.releasePublicKey,signing.publicPem);
+  assert.equal(formatEnv(config).includes('releasePublicKey'),false);
+  assert.equal(formatEnv(config).includes(signing.privatePem),false);
+});
+
 test('private env is unambiguous and cannot carry unescaped credentials',()=>{
   const normalized=validateSetup({...sample,dbPassword:'with="quotes"\\slash'});
   const string=formatEnv(normalized);
