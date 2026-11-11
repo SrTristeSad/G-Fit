@@ -148,7 +148,7 @@ function App() {
           </section>
         ) : (
           <>
-            {!teacher.isAdmin && <nav aria-label="Área do professor" className="tabs teacher-tabs">
+            {!teacher.isAdmin && tab !== 'account' && <nav aria-label="Área do professor" className="tabs teacher-tabs">
               <button className={tab === 'students' ? 'active' : ''} onClick={() => { setTab('students'); setSelectedId(null); }}>
                 Meus alunos
               </button>
