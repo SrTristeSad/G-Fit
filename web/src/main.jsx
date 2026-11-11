@@ -35,6 +35,8 @@ function App() {
   const route = resolveWorkspaceRoute(pathname, teacher);
   const tab = route.view === 'account' ? 'account'
     : teacher?.isAdmin ? 'admin' : route.view;
+  const adminEntry = pathname === '/admin' || pathname.startsWith('/admin/');
+  const registering = !adminEntry && mode === 'register';
 
   useEffect(() => {
     const onPopState = () => {
@@ -86,8 +88,8 @@ function App() {
         email: String(form.get('email')),
         password: String(form.get('password')),
       };
-      if (mode === 'register') body.name = String(form.get('name'));
-      const result = await api('/api/auth/' + (mode === 'register' ? 'register' : 'login'), {
+      if (registering) body.name = String(form.get('name'));
+      const result = await api('/api/auth/' + (registering ? 'register' : 'login'), {
         method: 'POST', body: JSON.stringify(body),
       });
       setTeacher(result.teacher);
@@ -144,30 +146,32 @@ function App() {
       <main className={teacher?.isAdmin ? 'admin-root' : undefined}>
         {!teacher ? (
           <section className="auth card">
-            <div className="eyebrow">Movimento com cuidado</div>
-            <h1>{mode === 'login' ? 'Bem-vindo ao G Fit' : 'Criar conta de professor'}</h1>
-            <p className="muted">Organize seus alunos e as atividades com segurança e praticidade.</p>
+            <div className="eyebrow">{adminEntry ? 'Área administrativa' : 'Movimento com cuidado'}</div>
+            <h1>{adminEntry ? 'Entrar na administração' : registering ? 'Criar conta de professor' : 'Bem-vindo ao G Fit'}</h1>
+            <p className="muted">{adminEntry
+              ? 'Acesso reservado às contas de administração do G Fit.'
+              : 'Organize seus alunos e as atividades com segurança e praticidade.'}</p>
             <form onSubmit={submitAuth}>
-              {mode === 'register' && (
+              {registering && (
                 <label>Nome completo<input name="name" autoComplete="name"
                   minLength="2" maxLength="120" required /></label>
               )}
               <label>E-mail<input name="email" type="email" autoComplete="email" required /></label>
               <label>Senha<input name="password" type="password"
-                minLength={mode === 'register' ? 10 : undefined}
+                minLength={registering ? 10 : undefined}
                 maxLength="128"
-                autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required /></label>
+                autoComplete={registering ? 'new-password' : 'current-password'} required /></label>
               {error && <p role="alert" className="error">{error}</p>}
               <button className="primary" type="submit" disabled={busy}>
-                {busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Criar conta'}
+                {busy ? 'Aguarde…' : registering ? 'Criar conta' : 'Entrar'}
               </button>
             </form>
-            <button className="link" onClick={() => {
+            {!adminEntry && <button className="link" onClick={() => {
               setMode(mode === 'login' ? 'register' : 'login');
               setError('');
             }}>
-              {mode === 'login' ? 'Primeiro acesso? Criar conta' : 'Já tenho uma conta'}
-            </button>
+              {registering ? 'Já tenho uma conta' : 'Primeiro acesso? Criar conta'}
+            </button>}
           </section>
         ) : (
           <>
