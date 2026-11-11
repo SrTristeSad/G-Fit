@@ -88,8 +88,13 @@ Se necessário, faça a instalação por túnel SSH para `127.0.0.1:<porta-confi
 2. Abra **Project log** e copie o número exibido em **`CÓDIGO DE INSTALAÇÃO: XXXXXXXX`**.
 3. Abra o domínio HTTPS mapeado. A tela **G-Fit — Instalação aaPanel** aparecerá.
 4. Insira o código, host/porta/banco/usuário/senha do PostgreSQL e o e-mail/senha da **primeira conta de administrador**.
-5. Clique **Instalar G-Fit**. A página acompanha as etapas de dependências, build React, migrações, administrador e inicialização.
-6. Ao concluir, clique **Abrir G-Fit**. Faça login com a senha administrativa que acabou de escolher.
+5. Na seção **Chave de segurança das atualizações**, clique **Gerar e baixar chave privada**. O navegador gera um par Ed25519 usando WebCrypto. **A chave privada é baixada no computador; apenas a chave pública é enviada ao G-Fit**. Salve duas cópias seguras fora da VPS e confirme o backup no formulário. A geração exige HTTPS (ou localhost) e um navegador atualizado com Ed25519 WebCrypto.
+6. Clique **Instalar G-Fit**. A página acompanha dependências, build React, migrações, administrador, API e instalação **automática da chave pública confiável** fora da pasta do site.
+7. Ao concluir, clique **Abrir G-Fit** e faça login com a senha administrativa escolhida. A versão de instalação limpa desta edição é **0.3.0**.
+
+**Senhas:** o banco grava o hash `scrypt` com salt aleatório das senhas de usuário, não a senha original. Senhas são enviadas à API via HTTPS para autenticação e nunca são salvas no navegador em localStorage. A **senha do PostgreSQL** é uma credencial de serviço diferente: a instância precisa guardá-la num arquivo privado (`instance.env`) fora da pasta pública para conseguir conectar ao banco.
+
+**Chaves de atualização:** não confunda a senha do administrador com a chave privada de assinatura. A chave privada é indispensável para gerar ZIPs futuros e nunca deve ser enviada à VPS, colada em chats ou comitada no GitHub. Se perder essa chave, a rotação de confiança exigirá procedimento manual supervisionado no servidor.
 
 O código tem **8 dígitos** e é conferido pelo servidor. Após cinco erros, a entrada fica bloqueada por 15 minutos. Não inclua código, credenciais ou tokens em URLs, capturas de tela ou mensagens públicas.
 
@@ -113,7 +118,9 @@ Para configurar o Pix Sandbox, mantenha as chaves **fora do Git**. O instalador 
 **Migração da versão antiga:** se o aaPanel já usa o atualizador **ZIP v1 sem assinatura**, ele não reconhece o novo manifesto **v2 assinado**. Essa passagem exige uma única atualização assistida dos arquivos da aplicação (por exemplo, transferência SFTP ou Gerenciador de Arquivos do aaPanel), com backup independente, manutenção e reinício. **Não exclua o diretório privado da instalação nem o banco PostgreSQL.** Depois de subir esta versão, instale a chave pública confiável; a partir daí, novos ZIPs assinados podem ser enviados pelo próprio painel. Não tente forçar um ZIP v2 pelo atualizador v1 nem desativar as verificações de assinatura.
 
 
-**Passo único antes da primeira atualização:** configure uma chave pública confiável no aaPanel. A chave **privada nunca deve sair do computador que cria a release**. Um ZIP traz a assinatura Ed25519 do seu manifesto; o supervisor verifica essa assinatura com a chave pública instalada **fora do diretório do site**, antes de instalar dependências.
+**Instalação limpa v0.3.0:** o assistente gera o par Ed25519 **no navegador** e instala automaticamente somente a chave pública confiável no diretório privado do serviço. Você precisa **baixar e guardar a chave privada localmente** antes de confirmar a instalação. O supervisor verifica a assinatura Ed25519 de cada ZIP usando a chave pública, antes de instalar dependências. **Não gere chaves novas a cada atualização:** use a mesma chave privada baixada na instalação inicial.
+
+**Instalações antigas ou migração manual:** se o servidor já estiver configurado sem a chave, mantenha o fluxo abaixo, executando `scripts/trust-release-key.mjs` com o usuário correto. O instalador não substitui chaves públicas existentes e nunca armazena a privada.
 
 No **computador de desenvolvimento**, com o código G-Fit:
 
@@ -133,10 +140,10 @@ A chave pública fica em `~/.config/gfit/<identificador>/trusted-release-key.pem
 Para cada nova versão, gere um ZIP **assinado** na máquina onde fica a chave privada:
 
 ```bash
-npm run release:zip -- --version 0.1.1 --key ../gfit-releases-private.pem
+npm run release:zip -- --version 0.3.1 --key /caminho-local/gfit-chave-privada-atualizacoes.pem
 ```
 
-Isso produz `releases/gfit-0.1.1.zip`. Para atualizar, use uma versão maior que a instalada (por exemplo, `0.1.2`). O ZIP não deve conter chaves, `.env` ou dados pessoais.
+Isso produz `releases/gfit-0.3.1.zip`. Para atualizar, use uma versão maior que a instalada (por exemplo, `0.3.2`). O ZIP não deve conter chaves, `.env` ou dados pessoais.
 
 Na aplicação HTTPS, entre com o administrador e abra **Administração → Atualizações**. O painel mostra a impressão digital da chave pública instalada. Digite a senha administrativa atual, selecione o ZIP e envie. O backend rejeita ZIPs sem assinatura, assinados por outra chave, com CRC/hashes incorretos, com caminhos perigosos, com versões antigas, **sem os módulos essenciais** ou sem os dois lockfiles de dependências.
 
@@ -167,7 +174,7 @@ Os comandos em `scripts/backup.mjs` e `scripts/restore-check.mjs` foram escritos
 - **Falha ao instalar dependências / npm código 243:** normalmente indica problema de permissões ou pasta pessoal/cache npm inacessível para o usuário de execução (por exemplo, `www`). O G-Fit agora usa um `HOME` e cache npm privados dentro do diretório de configuração, sem depender do cache global do servidor. Se persistir, confira a propriedade/permissões **somente da pasta real do G-Fit** (`api/`, `web/`, `node_modules/`, `web/dist`) para o usuário configurado em **Run User**, além da integridade dos lockfiles. Não use `chmod -R 777`, não instale com `sudo` e não mude as permissões do Livro ou de outros projetos. O instalador diferencia falhas de permissão, disco cheio e rede; o código `243` isoladamente não identifica a causa com certeza.
 
   Exemplo de diagnóstico **sem alterar arquivos**, adaptando o caminho para o diretório real do G-Fit: `ls -ld /www/wwwroot/G-Fit /www/wwwroot/G-Fit/api /www/wwwroot/G-Fit/web /www/wwwroot/G-Fit/api/node_modules /www/wwwroot/G-Fit/web/node_modules 2>/dev/null`. Confira o usuário em **Node.js Project → Run User**. Corrija a propriedade exclusivamente desses diretórios após conferir o caminho e ter backup.
-- **Assinatura não configurada:** gere o par Ed25519 fora do repositório, copie somente a chave pública e execute `node scripts/trust-release-key.mjs` na VPS, com o usuário do projeto.
+- **Assinatura não configurada:** na **instalação limpa 0.3.0** use o botão de geração de chaves no navegador e confirme o backup privado; a chave pública é instalada automaticamente. Para instalações antigas, copie somente a chave pública correspondente e execute `node scripts/trust-release-key.mjs` com o usuário do projeto. Não coloque a chave privada na VPS.
 - **ZIP rejeitado por migração:** alterações no arquivo central `api/src/db.js` exigem atualização manual supervisionada, não ativação por ZIP.
 - **Rate limiting compartilhado:** confirme que o Nginx sobrescreve `X-Real-IP` com `$remote_addr`, habilite `GFIT_TRUST_REAL_IP=true` no processo Node.js do aaPanel e reinicie. Sem a opção, o proxy usa loopback por segurança.
 - **Erro 413 ao enviar ZIP:** confira o limite de upload do Nginx em `client_max_body_size` e permita pelo menos 33 MiB no projeto. Verifique a configuração com `nginx -t` antes de recarregá-la. O limite interno do ZIP permanece em 32 MiB.
