@@ -11,6 +11,8 @@ import {createServer} from 'node:net';
 
 const base='http://127.0.0.1:3339';
 const privateDir=await fs.mkdtemp(path.join(os.tmpdir(),'gfit-aapanel-e2e-'));
+// Simulate aaPanel service accounts with no valid HOME directory.
+const inaccessibleHome=path.join(privateDir,'nonexistent-service-home');
 const signing=createKeyPair();
 await fs.writeFile(path.join(privateDir,'trusted-release-key.pem'),signing.publicPem,{mode:0o600});
 // Other applications on the same VPS may occupy legacy G-Fit ports.
@@ -29,7 +31,7 @@ for(const port of [3001,3333]){
 }
 const launcher=spawn(process.execPath,['aapanel/launcher.mjs'],{
   cwd:process.cwd(),
-  env:{...process.env,GFIT_PORT:undefined,PORT:'3339',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
+  env:{...process.env,HOME:inaccessibleHome,GFIT_PORT:undefined,PORT:'3339',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
   stdio:['ignore','pipe','pipe'],
 });
 let output='';
@@ -61,7 +63,10 @@ try{
   }
   const homepage=await fetch(base+'/');
   assert.equal(homepage.status,200);
-  assert.ok((await homepage.text()).includes('G-Fit | Instalação aaPanel'));
+  const installerHtml=await homepage.text();
+  assert.ok(installerHtml.includes('G-Fit | Instalação aaPanel'));
+  assert.ok(installerHtml.includes('Project Port 3344'));
+  assert.ok(!installerHtml.includes('porta <strong>3333</strong>'));
   assert.equal((await request('/setup/status',{code:'0000000X'})).status,403);
   // Cross-origin setup requests are rejected even with the correct code.
   assert.equal((await request('/setup/status',{code},{Origin:'http://example.test'})).status,403);
@@ -138,6 +143,9 @@ try{
   });
   assert.equal(independent.status,200,'different client IP should have its own rate limit');
 
+  assert.equal((await fs.stat(path.join(privateDir,'npm-home'))).isDirectory(),true);
+  assert.equal((await fs.stat(path.join(privateDir,'npm-cache'))).isDirectory(),true);
+  assert.equal(await fs.stat(inaccessibleHome).then(()=>true,()=>false),false);
   const config=await fs.readFile(path.join(privateDir,'instance.env'),'utf8');
   assert.ok(config.includes('BIND_HOST="127.0.0.1"'));
   assert.ok(config.includes('COOKIE_SECURE="true"'));
