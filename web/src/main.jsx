@@ -38,13 +38,16 @@ function App() {
 
   useEffect(() => {
     api('/api/auth/me')
-      .then(data => setTeacher(data.teacher))
+      .then(data => {
+        setTeacher(data.teacher);
+        setTab(data.teacher.isAdmin ? 'admin' : 'students');
+      })
       .catch(() => {})
       .finally(() => setChecking(false));
   }, []);
 
   useEffect(() => {
-    if (teacher) {
+    if (teacher && !teacher.isAdmin) {
       refreshStudents().catch(err => setError(err.message));
     }
   }, [teacher, refreshStudents]);
@@ -65,7 +68,7 @@ function App() {
       });
       setTeacher(result.teacher);
       setSelectedId(null);
-      setTab('students');
+      setTab(result.teacher.isAdmin ? 'admin' : 'students');
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
@@ -102,15 +105,20 @@ function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand"><span className="symbol">G</span><span>Fit</span></div>
+        <div className="brand"><span className="symbol">G</span><span>Fit</span><span className="brand-subtitle">Plataforma de gestão</span></div>
         {teacher && (
           <div className="header-actions">
+            <span className="workspace-badge">{teacher.isAdmin ? 'Administrador' : 'Professor'}</span>
             <span className="header-name">{teacher.name}</span>
+            <button className="header-shortcut" type="button" onClick={() => {
+              setTab(tab === 'account' ? (teacher.isAdmin ? 'admin' : 'students') : 'account');
+              setSelectedId(null);
+            }}>{tab === 'account' ? 'Voltar ao painel' : 'Conta e segurança'}</button>
             <button className="secondary" disabled={busy} onClick={logout}>Sair</button>
           </div>
         )}
       </header>
-      <main>
+      <main className={teacher?.isAdmin ? 'admin-root' : undefined}>
         {!teacher ? (
           <section className="auth card">
             <div className="eyebrow">Movimento com cuidado</div>
@@ -140,48 +148,32 @@ function App() {
           </section>
         ) : (
           <>
-            <nav aria-label="Áreas do sistema" className="tabs">
+            {!teacher.isAdmin && <nav aria-label="Área do professor" className="tabs teacher-tabs">
               <button className={tab === 'students' ? 'active' : ''} onClick={() => { setTab('students'); setSelectedId(null); }}>
                 Meus alunos
               </button>
-              {!teacher.isAdmin && (
-                <button className={tab === 'library' ? 'active' : ''} onClick={() => {
-                  setTab('library'); setSelectedId(null);
-                }}>Biblioteca de exercícios</button>
-              )}
-              {!teacher.isAdmin && (
-                <button className={tab === 'classes' ? 'active' : ''} onClick={() => {
-                  setTab('classes'); setSelectedId(null);
-                }}>Turmas e presença</button>
-              )}
-              {!teacher.isAdmin && (
-                <button className={tab === 'reports' ? 'active' : ''} onClick={() => {
-                  setTab('reports'); setSelectedId(null);
-                }}>Relatórios</button>
-              )}
-              {teacher.isAdmin && (
-                <button className={tab === 'admin' ? 'active' : ''} onClick={() => {
-                  setTab('admin'); setSelectedId(null);
-                }}>Administração</button>
-              )}
-              {!teacher.isAdmin && (
-                <button className={tab === 'billing' ? 'active' : ''} onClick={() => {
-                  setTab('billing'); setSelectedId(null);
-                }}>Pix (teste)</button>
-              )}
-              <button className={tab === 'account' ? 'active' : ''} onClick={() => {
-                setTab('account'); setSelectedId(null);
-              }}>Minha conta</button>
-            </nav>
-            {tab === 'billing' && !teacher.isAdmin ? <BillingPanel /> :
-              tab === 'account' ? <AccountPanel onPasswordChanged={() => {
+              <button className={tab === 'library' ? 'active' : ''} onClick={() => {
+                setTab('library'); setSelectedId(null);
+              }}>Exercícios</button>
+              <button className={tab === 'classes' ? 'active' : ''} onClick={() => {
+                setTab('classes'); setSelectedId(null);
+              }}>Turmas e presença</button>
+              <button className={tab === 'reports' ? 'active' : ''} onClick={() => {
+                setTab('reports'); setSelectedId(null);
+              }}>Relatórios</button>
+              <button className={tab === 'billing' ? 'active' : ''} onClick={() => {
+                setTab('billing'); setSelectedId(null);
+              }}>Pix (teste)</button>
+            </nav>}
+            {tab === 'account' ? <AccountPanel onPasswordChanged={() => {
                 setTeacher(null); setStudents([]); setTab('students'); setSelectedId(null);
                 setError('Senha alterada. Entre novamente com a nova senha.');
               }} /> :
-              tab === 'admin' && teacher.isAdmin ? <AdminPanel /> :
-              tab === 'library' && !teacher.isAdmin ? <ExerciseLibrary /> :
-              tab === 'classes' && !teacher.isAdmin ? <ClassManager /> :
-              tab === 'reports' && !teacher.isAdmin ? <ReportsPanel /> :
+              teacher.isAdmin ? <AdminPanel onOpenSecurity={() => setTab('account')} /> :
+              tab === 'billing' ? <BillingPanel /> :
+              tab === 'library' ? <ExerciseLibrary /> :
+              tab === 'classes' ? <ClassManager /> :
+              tab === 'reports' ? <ReportsPanel /> :
               selectedId ? (
                 <StudentProfile id={selectedId} onBack={() => setSelectedId(null)} onChanged={refreshStudents} />
               ) : (
