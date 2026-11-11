@@ -15,7 +15,7 @@ import {
 } from './update-core.mjs';
 import {
   validateSetup,formatEnv,parseEnv,isSecureInstallerRequest,
-  installCodeMatches,resolvePublicPort,
+  installCodeMatches,resolvePublicPort,isAllowedInstallerOrigin,
 } from './setup-utils.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -142,17 +142,6 @@ function respond(res,status,data,extra={}){
     ...extra,
   });
   res.end(body);
-}
-function isAllowedOrigin(req){
-  const origin=req.headers.origin;
-  if(!origin)return true;
-  try{
-    const parsed=new URL(origin);
-    const hostHeader=req.headers.host;
-    if(parsed.host!==hostHeader)return false;
-    const expected=req.headers['x-forwarded-proto']==='https'?'https:':'http:';
-    return parsed.protocol===expected;
-  }catch{return false;}
 }
 async function readInput(req){
   let bytes=0;
@@ -322,7 +311,7 @@ async function setupHandler(req,res,url){
   if(!isSecureInstallerRequest(req)){
     return respond(res,403,{error:'Abra o instalador por HTTPS via domínio aaPanel, ou pelo túnel localhost.'});
   }
-  if(!isAllowedOrigin(req)){
+  if(!isAllowedInstallerOrigin(req)){
     return respond(res,403,{error:'Origem não autorizada.'});
   }
   if(Date.now()<state.lockedUntil){
