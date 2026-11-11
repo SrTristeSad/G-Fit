@@ -50,6 +50,26 @@ export function parseEnv(text) {
   }
   return env;
 }
+// Browser origin protection behind aaPanel's reverse proxy.
+// Some aaPanel mappings replace the upstream Host with 127.0.0.1:PORT.
+// In that case, a real same-origin browser fetch still carries
+// Sec-Fetch-Site: same-origin, which page scripts on a foreign site cannot forge.
+// Do not accept "same-site", "cross-site" or missing Fetch Metadata as a bypass.
+export function isAllowedInstallerOrigin(req) {
+  const origin=req.headers.origin;
+  if(!origin)return true;
+  try {
+    const parsed=new URL(origin);
+    const expected=req.headers['x-forwarded-proto']==='https'?'https:':'http:';
+    if(parsed.protocol!==expected || parsed.origin==='null')return false;
+    if(parsed.username||parsed.password||parsed.pathname!=='/'||parsed.search||parsed.hash)return false;
+    const upstreamHost=String(req.headers.host||'').toLowerCase();
+    if(parsed.host===upstreamHost)return true;
+    // Only allow a proxy-rewritten Host for browser-verified same-origin fetches.
+    return req.headers['sec-fetch-site']==='same-origin';
+  }catch{return false;}
+}
+
 export function isLoopback(addr) {
   return addr==='127.0.0.1'||addr==='::1'||addr==='::ffff:127.0.0.1';
 }
