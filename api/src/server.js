@@ -420,4 +420,12 @@ await initDatabase();
 startAdminAlertScanner();
 const port = Number(process.env.PORT || 3001);
 const bindHost = process.env.BIND_HOST || '0.0.0.0';
-app.listen(port, bindHost, () => console.log('G Fit API iniciada na porta', port));
+const server = app.listen(port, bindHost, () => {
+  const actualPort = server.address().port;
+  console.log('G Fit API iniciada na porta', actualPort);
+  // O supervisor do aaPanel usa IPC para conhecer a porta interna efêmera.
+  // Docker e execução direta continuam funcionando sem IPC.
+  if (typeof process.send === 'function') {
+    process.send({ type: 'gfit-api-ready', port: actualPort });
+  }
+});
