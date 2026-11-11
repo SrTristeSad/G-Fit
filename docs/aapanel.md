@@ -78,6 +78,8 @@ proxy_set_header X-Real-IP $remote_addr;
 
 Edite **somente** a configuração correta do projeto no aaPanel e **faça backup antes de mexer em Nginx**. Não inclua esse cabeçalho em outro bloco sem verificar se já foi configurado; duplicatas podem causar falha em `nginx -t`. O aaPanel gerencia os demais cabeçalhos e o certificado.
 
+**Erro "Origem não autorizada" ao instalar pelo domínio HTTPS:** algumas configurações de proxy enviam `Host: 127.0.0.1:<porta>` ao Node.js, embora o navegador envie o `Origin` público. O instalador agora reconhece as solicitações que o navegador confirma como `Sec-Fetch-Site: same-origin`, mantendo a recusa de requisições `cross-site`. O ideal continua sendo configurar `proxy_set_header Host $host;` no virtual host correto e preservar `X-Forwarded-Proto: https`. Verifique também se o domínio é **exclusivo do G-Fit**: não use o domínio de outro projeto para instalar.
+
 Se necessário, faça a instalação por túnel SSH para `127.0.0.1:<porta-configurada>` (por exemplo, `3344`) e configure o HTTPS antes de usar contas reais.
 
 ## 3. Instalar pelo navegador
