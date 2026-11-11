@@ -28,8 +28,8 @@ No aaPanel, use **Website → Node.js Project → Add Project → Default Projec
 | Diretório / Path | `/www/wwwroot/G-Fit` (ou outra pasta com o repositório) |
 | Node.js runtime | **22** |
 | Run User | **www** (recomendado pelo aaPanel) |
-| Start command | **`node aapanel/launcher.mjs`** |
-| Project Port | **3333** |
+| Start command | **`npm start -- --port=3344`** (exemplo; utilize a mesma porta configurada abaixo) |
+| Project Port | **3344** (exemplo; escolha uma porta livre, diferente das dos outros projetos) |
 | Install dependencies | **Desativado**: o instalador gerencia esse passo |
 | Mapping | **Ativado**, apontando o domínio para o projeto |
 | SSL | **Ativado antes de preencher o formulário de instalação** |
@@ -43,7 +43,22 @@ git clone https://github.com/SrTristeSad/G-Fit.git
 
 O usuário escolhido no aaPanel deve ter **permissão de leitura e gravação no diretório do projeto** (para `node_modules` e `web/dist`) e em sua pasta privada de configuração no diretório inicial. O instalador cria a pasta privada automaticamente, fora do diretório público. O launcher serve somente arquivos de `web/dist`.
 
-**Importante:** a aplicação escuta apenas em **127.0.0.1:3333**, não em `0.0.0.0:3333`. O aaPanel faz o Mapping e publica o domínio na porta 443. Não é necessário liberar a porta 3333 nem a 3001 no firewall. A API interna usa 127.0.0.1:3001.
+**Importante:** o G-Fit escuta apenas em **127.0.0.1 na porta configurada** (por exemplo, `3344`), nunca em `0.0.0.0`. O aaPanel faz o Mapping e publica o domínio pela porta 443. **A porta do comando inicial e a opção Project Port devem coincidir.** A API interna escolhe automaticamente outra porta de loopback livre a cada inicialização: não usa mais `3001` fixa. Não é preciso liberar essas portas internas no firewall.
+
+### Porta dinâmica, sem editar o código
+
+A porta externa é configurável por variável de ambiente ou argumento do inicializador:
+
+```bash
+# Prioridade: --port > GFIT_PORT > PORT > padrão 3333
+npm start -- --port=3344
+# Ou, se o aaPanel fornecer PORT no ambiente:
+PORT=3344 npm start
+```
+
+O campo **Project Port** do aaPanel deve ser igual à porta realmente usada pelo G-Fit. O aaPanel não garante que o campo seja automaticamente disponibilizado na variável de ambiente `PORT`; por isso, a maneira mais previsível é selecionar um **Custom Start Command** com `npm start -- --port=3344` e preencher `3344` em **Project Port**. Para mudar de porta no futuro, altere **somente esses dois valores nas configurações do aaPanel**, sem editar nenhum arquivo JavaScript. O servidor informa no log qual porta está usando.
+
+A porta **interna** da API é sempre escolhida pelo sistema operacional, independentemente da `PORT` externa. Assim, outros projetos podem continuar usando `3001` e `3333` sem colidir com essa API. **Não ative escolha aleatória para a porta externa:** isso quebraria o proxy, porque o Mapping continuaria apontando para o número anterior.
 
 ### HTTPS e cabeçalhos
 
@@ -61,7 +76,7 @@ proxy_set_header X-Real-IP $remote_addr;
 
 Edite **somente** a configuração correta do projeto no aaPanel e **faça backup antes de mexer em Nginx**. Não inclua esse cabeçalho em outro bloco sem verificar se já foi configurado; duplicatas podem causar falha em `nginx -t`. O aaPanel gerencia os demais cabeçalhos e o certificado.
 
-Se necessário, faça a instalação via túnel SSH para `127.0.0.1:3333` e configure o HTTPS antes de usar contas reais.
+Se necessário, faça a instalação por túnel SSH para `127.0.0.1:<porta-configurada>` (por exemplo, `3344`) e configure o HTTPS antes de usar contas reais.
 
 ## 3. Instalar pelo navegador
 
@@ -81,7 +96,7 @@ O G-Fit exige `api/package-lock.json` e `web/package-lock.json`, versionados com
 ## 4. Após a configuração inicial
 
 - O launcher grava a conexão PostgreSQL **fora da pasta do site**, em `~/.config/gfit/<identificador-da-instalação>/instance.env`, com pasta privada (0700) e arquivo privado (0600), sob o usuário que executa o projeto. Não grava senha administrativa em texto. Nunca copie esse arquivo para o diretório público nem comite suas credenciais no GitHub.
-- A aplicação passa a servir o React e a API na mesma origem do domínio (porta 3333 atrás do proxy); a API fica na porta interna 3001.
+- A aplicação passa a servir o React e a API na mesma origem do domínio (porta configurada, por exemplo `3344`, atrás do proxy); a porta interna da API é atribuída automaticamente pelo sistema operacional.
 - O instalador deixa de ficar acessível após a configuração inicial; **não existe rota pública para criar outro administrador**.
 - Para reiniciar o sistema, use **Node.js Project → Restart** no aaPanel, não execute outra instalação.
 - O aaPanel gerencia o processo principal. O launcher inicia a API como processo filho, e a parada do serviço encaminha os sinais à API.
@@ -143,7 +158,7 @@ Os comandos em `scripts/backup.mjs` e `scripts/restore-check.mjs` foram escritos
 
 ## Diagnóstico
 
-- **502 no domínio:** confira se a aplicação está em execução no aaPanel e se o Mapping aponta para **127.0.0.1:3333**. Verifique os logs do projeto.
+- **502 no domínio:** confira se a aplicação está em execução e se **Project Port, Mapping e `--port`** apontam para a **mesma porta** (exemplo: `3344`). Verifique os logs do projeto.
 - **`node: command not found` ou versão errada:** escolha Node.js 22 em **Node version manager → Command line ver**, ou no runtime do Node.js Project.
 - **Falha ao instalar dependências:** confirme acesso à internet, permissões da pasta e saída do processo. O instalador exige lockfile válido e usa somente `npm ci --ignore-scripts`.
 - **Assinatura não configurada:** gere o par Ed25519 fora do repositório, copie somente a chave pública e execute `node scripts/trust-release-key.mjs` na VPS, com o usuário do projeto.
@@ -153,7 +168,7 @@ Os comandos em `scripts/backup.mjs` e `scripts/restore-check.mjs` foram escritos
 - **Backup obrigatório falhou ao ativar:** instale o cliente `pg_dump` compatível com seu PostgreSQL e torne-o acessível no PATH do usuário do Node.js no aaPanel. O código não será substituído enquanto esse backup não for concluído.
 - **Falha PostgreSQL:** verifique host, porta, senha, acesso e permissões do usuário **gfit** no banco. Se o administrador foi criado em uma tentativa anterior, repita com as **mesmas credenciais**; o instalador não substitui o administrador existente.
 - **Instalação bloqueada por HTTP:** abra com certificado HTTPS e Mapping correto, ou instale via túnel SSH local.
-- **"Porta 3001 em uso":** não execute outra API G-Fit em paralelo na mesma VPS. Escolha a implantação aaPanel ou Docker, não ambas.
+- **Porta ocupada (`EADDRINUSE`):** escolha uma porta pública livre para este projeto e configure-a no campo **Project Port** e no comando **`npm start -- --port=<porta>`**. **Não altere nem finalize o projeto que já ocupa essa porta.** O G-Fit escolhe automaticamente uma porta interna livre para a API.
 - **Senha de banco esquecida após instalar:** exige procedimento operacional de rotação de credenciais no PostgreSQL e no arquivo privado `instance.env`; o instalador não oferece um endpoint público de recuperação.
 - **Dados clínicos reais e Pix:** não habilite. O produto ainda é um protótipo sem adequação completa à LGPD e sem homologação de pagamentos de produção.
 
