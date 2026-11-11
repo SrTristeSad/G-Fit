@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {timingSafeEqual} from 'node:crypto';
 import {
   validateSetup,formatEnv,parseEnv,
-  isSecureInstallerRequest,installCodeMatches,resolvePublicPort,
+  isSecureInstallerRequest,isAllowedInstallerOrigin,installCodeMatches,resolvePublicPort,
 } from '../setup-utils.mjs';
 
 const sample={
@@ -56,6 +56,23 @@ test('setup rejects plain HTTP mapped domains; allows local SSH tunnel and TLS m
   assert.equal(isSecureInstallerRequest(req('example.com')),false);
   assert.equal(isSecureInstallerRequest(req('example.com','https')),true);
   assert.equal(isSecureInstallerRequest(req('example.com','https','1.2.3.4')),false);
+});
+
+test('installer same-origin is preserved when aaPanel rewrites upstream Host',()=>{
+  const req=(origin,host='127.0.0.1:3344',site='same-origin',proto='https')=>({
+    headers:{origin,host,'x-forwarded-proto':proto,'sec-fetch-site':site},
+  });
+  const browserOrigin='https://livro.snulog.shop';
+  assert.equal(isAllowedInstallerOrigin(req(browserOrigin)),true);
+  assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'livro.snulog.shop',undefined)),true);
+  assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'127.0.0.1:3344','cross-site')),false);
+  assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'127.0.0.1:3344','same-site')),false);
+  assert.equal(isAllowedInstallerOrigin(req(browserOrigin,'127.0.0.1:3344',undefined)),false);
+  assert.equal(isAllowedInstallerOrigin(req('https://evil.example','livro.snulog.shop','cross-site')),false);
+  assert.equal(isAllowedInstallerOrigin(req('http://livro.snulog.shop','127.0.0.1:3344','same-origin')),false);
+  assert.equal(isAllowedInstallerOrigin(req('null')),false);
+  assert.equal(isAllowedInstallerOrigin(req('https://livro.snulog.shop/malicious')),false);
+  assert.equal(isAllowedInstallerOrigin(req(undefined)),true);
 });
 
 test('aaPanel public port honors CLI, GFIT_PORT and standard PORT without source edits',()=>{
