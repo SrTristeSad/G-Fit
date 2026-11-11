@@ -157,8 +157,8 @@ jobs:
         run: |
           npm test
           node scripts/generate-release-keys.mjs "$RUNNER_TEMP/ci-release-private.pem" "$RUNNER_TEMP/ci-release-public.pem"
-          npm run release:zip -- --version 0.1.1 --key "$RUNNER_TEMP/ci-release-private.pem"
-          test -s releases/gfit-0.1.1.zip
+          npm run release:zip -- --version 0.3.1 --key "$RUNNER_TEMP/ci-release-private.pem"
+          test -s releases/gfit-0.3.1.zip
       - name: aaPanel full installation with disposable PostgreSQL
         run: |
           set -euo pipefail
