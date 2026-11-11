@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api } from './api.js';
+import { homeFor, resolveWorkspaceRoute, urlFor } from './routes.js';
 import StudentProfile from './StudentProfile.jsx';
 import ExerciseLibrary from './ExerciseLibrary.jsx';
 import ClassManager from './ClassManager.jsx';
@@ -14,7 +15,7 @@ function App() {
   const [teacher, setTeacher] = useState(null);
   const [checking, setChecking] = useState(true);
   const [mode, setMode] = useState('login');
-  const [tab, setTab] = useState('students');
+  const [pathname, setPathname] = useState(() => window.location.pathname);
   const [selectedId, setSelectedId] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -23,6 +24,32 @@ function App() {
   const [myPlan, setMyPlan] = useState(null);
   const [myAccess, setMyAccess] = useState(null);
   const [studentName, setStudentName] = useState('');
+  const navigate = useCallback((url, { replace = false } = {}) => {
+    if (window.location.pathname !== url) {
+      window.history[replace ? 'replaceState' : 'pushState'](null, '', url);
+    }
+    setPathname(url);
+    setSelectedId(null);
+  }, []);
+
+  const route = resolveWorkspaceRoute(pathname, teacher);
+  const tab = route.view === 'account' ? 'account'
+    : teacher?.isAdmin ? 'admin' : route.view;
+
+  useEffect(() => {
+    const onPopState = () => {
+      setPathname(window.location.pathname);
+      setSelectedId(null);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (teacher && route.redirect) {
+      navigate(route.redirect, { replace: true });
+    }
+  }, [teacher, route.redirect, navigate]);
 
   const refreshStudents = useCallback(async () => {
     const [result, planInfo, accessInfo] = await Promise.all([
@@ -38,10 +65,7 @@ function App() {
 
   useEffect(() => {
     api('/api/auth/me')
-      .then(data => {
-        setTeacher(data.teacher);
-        setTab(data.teacher.isAdmin ? 'admin' : 'students');
-      })
+      .then(data => setTeacher(data.teacher))
       .catch(() => {})
       .finally(() => setChecking(false));
   }, []);
@@ -67,8 +91,8 @@ function App() {
         method: 'POST', body: JSON.stringify(body),
       });
       setTeacher(result.teacher);
-      setSelectedId(null);
-      setTab(result.teacher.isAdmin ? 'admin' : 'students');
+      const target = resolveWorkspaceRoute(window.location.pathname, result.teacher);
+      navigate(target.redirect || (window.location.pathname === '/' ? homeFor(result.teacher) : window.location.pathname), { replace: true });
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
@@ -95,7 +119,7 @@ function App() {
       setMyPlan(null);
       setMyAccess(null);
       setSelectedId(null);
-      setTab('students');
+      navigate('/', { replace: true });
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
@@ -111,8 +135,7 @@ function App() {
             <span className="workspace-badge">{teacher.isAdmin ? 'Administrador' : 'Professor'}</span>
             <span className="header-name">{teacher.name}</span>
             <button className="header-shortcut" type="button" onClick={() => {
-              setTab(tab === 'account' ? (teacher.isAdmin ? 'admin' : 'students') : 'account');
-              setSelectedId(null);
+              navigate(tab === 'account' ? homeFor(teacher) : urlFor(teacher, 'account'));
             }}>{tab === 'account' ? 'Voltar ao painel' : 'Conta e segurança'}</button>
             <button className="secondary" disabled={busy} onClick={logout}>Sair</button>
           </div>
@@ -149,27 +172,30 @@ function App() {
         ) : (
           <>
             {!teacher.isAdmin && tab !== 'account' && <nav aria-label="Área do professor" className="tabs teacher-tabs">
-              <button className={tab === 'students' ? 'active' : ''} onClick={() => { setTab('students'); setSelectedId(null); }}>
+              <button className={tab === 'students' ? 'active' : ''} onClick={() => { navigate(urlFor(teacher, 'students')); }}>
                 Meus alunos
               </button>
               <button className={tab === 'library' ? 'active' : ''} onClick={() => {
-                setTab('library'); setSelectedId(null);
+                navigate(urlFor(teacher, 'library'));
               }}>Exercícios</button>
               <button className={tab === 'classes' ? 'active' : ''} onClick={() => {
-                setTab('classes'); setSelectedId(null);
+                navigate(urlFor(teacher, 'classes'));
               }}>Turmas e presença</button>
               <button className={tab === 'reports' ? 'active' : ''} onClick={() => {
-                setTab('reports'); setSelectedId(null);
+                navigate(urlFor(teacher, 'reports'));
               }}>Relatórios</button>
               <button className={tab === 'billing' ? 'active' : ''} onClick={() => {
-                setTab('billing'); setSelectedId(null);
+                navigate(urlFor(teacher, 'billing'));
               }}>Pix (teste)</button>
             </nav>}
             {tab === 'account' ? <AccountPanel onPasswordChanged={() => {
-                setTeacher(null); setStudents([]); setTab('students'); setSelectedId(null);
+                setTeacher(null); setStudents([]);
+                navigate('/', { replace: true });
                 setError('Senha alterada. Entre novamente com a nova senha.');
               }} /> :
-              teacher.isAdmin ? <AdminPanel onOpenSecurity={() => setTab('account')} /> :
+              teacher.isAdmin ? <AdminPanel view={route.view}
+                onNavigate={section => navigate(urlFor(teacher, section))}
+                onOpenSecurity={() => navigate(urlFor(teacher, 'account'))} /> :
               tab === 'billing' ? <BillingPanel /> :
               tab === 'library' ? <ExerciseLibrary /> :
               tab === 'classes' ? <ClassManager /> :
