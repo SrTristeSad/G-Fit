@@ -7,14 +7,25 @@ import path from 'node:path';
 import os from 'node:os';
 import {collectReleaseFiles,makeReleaseZip} from '../zip-release.mjs';
 import {createKeyPair} from '../release-trust.mjs';
+import {createServer} from 'node:net';
 
 const base='http://127.0.0.1:3339';
 const privateDir=await fs.mkdtemp(path.join(os.tmpdir(),'gfit-aapanel-e2e-'));
 const signing=createKeyPair();
 await fs.writeFile(path.join(privateDir,'trusted-release-key.pem'),signing.publicPem,{mode:0o600});
+// Other applications on the same VPS may occupy legacy G-Fit ports.
+const occupied=[];
+for(const port of [3001,3333]){
+  const blocker=createServer();
+  await new Promise((resolve,reject)=>{
+    blocker.once('error',reject);
+    blocker.listen(port,'127.0.0.1',resolve);
+  });
+  occupied.push(blocker);
+}
 const launcher=spawn(process.execPath,['aapanel/launcher.mjs'],{
   cwd:process.cwd(),
-  env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
+  env:{...process.env,GFIT_PORT:undefined,PORT:'3339',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
   stdio:['ignore','pipe','pipe'],
 });
 let output='';
@@ -125,9 +136,9 @@ try{
   launcher.kill('SIGTERM');
   for(let i=0;i<60&&launcher.exitCode===null;i++)await pause(100);
   assert.notEqual(launcher.exitCode,null,'launcher did not terminate gracefully');
-  restarted=spawn(process.execPath,['aapanel/launcher.mjs'],{
+  restarted=spawn(process.execPath,['aapanel/launcher.mjs','--port=3339'],{
     cwd:process.cwd(),
-    env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
+    env:{...process.env,GFIT_PORT:'3338',PORT:'3337',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
     stdio:['ignore','pipe','pipe'],
   });
   let restartLog='';
@@ -264,7 +275,7 @@ try{
   for(let i=0;i<80&&restarted.exitCode===null;i++)await pause(100);
   assert.notEqual(restarted.exitCode,null);
   finalRun=spawn(process.execPath,['aapanel/launcher.mjs'],{
-    cwd:process.cwd(),env:{...process.env,GFIT_PORT:'3339',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
+    cwd:process.cwd(),env:{...process.env,GFIT_PORT:'3339',PORT:'3338',GFIT_PRIVATE_DIR:privateDir,GFIT_TRUST_REAL_IP:'true'},
     stdio:['ignore','pipe','pipe'],
   });
   let finalOutput='';
@@ -281,7 +292,8 @@ try{
   assert.equal(finalOutput.includes('CÓDIGO DE INSTALAÇÃO:'),false);
   console.log('aaPanel ZIP: upload, staging, db backup, apply, code restart, version and admin persistence OK');
 
-}finally{
+ }finally{
   stop();
+  for(const blocker of occupied)await new Promise(resolve=>blocker.close(resolve));
   await fs.rm(privateDir,{recursive:true,force:true});
 }
