@@ -78,7 +78,7 @@ export function resolvePublicPort({argv=[],env={}}={}){
   }else if(flags.length){
     cli=flags[0].slice('--port='.length);
   }
-  const raw=cli ?? env.GFIT_PORT ?? env.PORT ?? '3333';
+  const raw=cli ?? env.GFIT_PORT ?? env.PORT ?? '3344';
   if(typeof raw!=='string'&&typeof raw!=='number')throw new Error('Porta inválida.');
   const value=String(raw);
   if(!/^\d{1,5}$/.test(value))throw new Error('Porta inválida: use um número entre 1024 e 65535.');
