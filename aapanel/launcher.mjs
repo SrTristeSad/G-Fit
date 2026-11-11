@@ -15,7 +15,7 @@ import {
 } from './update-core.mjs';
 import {
   validateSetup,formatEnv,parseEnv,isSecureInstallerRequest,
-  installCodeMatches,
+  installCodeMatches,resolvePublicPort,
 } from './setup-utils.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -39,15 +39,15 @@ const trustRealIp=process.env.GFIT_TRUST_REAL_IP==='true';
 let controlServer=null;
 let updateBusy=false;
 let updateInProgress=false;
-const port=Number(process.env.GFIT_PORT||3333);
+const port=resolvePublicPort({argv:process.argv.slice(2),env:process.env});
 const host=process.env.GFIT_HOST||'127.0.0.1';
-if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('Porta inválida.');
 if(host!=='127.0.0.1' && host!=='::1'){
   throw new Error('Por segurança, o instalador deve usar GFIT_HOST=127.0.0.1 ou ::1.');
 }
 const state={installed:false,running:false,phase:'aguardando',error:null,attempts:0,lockedUntil:0};
 const installCode=String(randomInt(0,100000000)).padStart(8,'0');
 let apiChild=null;
+let apiPort=null;
 let closing=false;
 async function stopApi(){
   const child=apiChild;
@@ -57,7 +57,7 @@ async function stopApi(){
     child.once('exit',()=>{clearTimeout(killTimer);resolve();});
     child.kill('SIGTERM');
   });
-  if(apiChild===child)apiChild=null;
+  if(apiChild===child){apiChild=null;apiPort=null;}
 }
 async function startControl(){
   await fs.mkdir(privateDir,{recursive:true,mode:0o700});
@@ -194,34 +194,66 @@ async function installDependencies(folder,includeDev){
     '--no-audit','--no-fund'],folder);
 }
 async function waitApiReady(child){
-  for(let i=0;i<80;i++){
-    if(child.exitCode!==null||child.signalCode!==null){
-      throw new Error('A API encerrou antes de ficar pronta.');
+  // A API pede uma porta livre ao sistema operacional (PORT=0). O número
+  // realmente reservado é comunicado por IPC, sem sondar nem disputar 3001.
+  const assignedPort=await new Promise((resolve,reject)=>{
+    let finished=false;
+    const timeout=setTimeout(()=>finish(new Error('API não iniciou em até 30 segundos.')),30000);
+    const onMessage=message=>{
+      if(message?.type!=='gfit-api-ready')return;
+      if(!Number.isInteger(message.port)||message.port<1||message.port>65535){
+        return finish(new Error('A API comunicou uma porta inválida.'));
+      }
+      finish(null,message.port);
+    };
+    const onExit=code=>finish(new Error('A API terminou durante a inicialização ('+code+').'));
+    const onError=error=>finish(error);
+    function finish(error,value){
+      if(finished)return;
+      finished=true;
+      clearTimeout(timeout);
+      child.removeListener('message',onMessage);
+      child.removeListener('exit',onExit);
+      child.removeListener('error',onError);
+      if(error)reject(error);else resolve(value);
     }
+    child.on('message',onMessage);
+    child.once('exit',onExit);
+    child.once('error',onError);
+  });
+  // Não aceitar somente uma mensagem: confira também o endpoint real.
+  for(let i=0;i<20;i++){
     try{
-      const response=await fetch('http://127.0.0.1:3001/api/health',{
+      const response=await fetch('http://127.0.0.1:'+assignedPort+'/api/health',{
         signal:AbortSignal.timeout(700),
       });
-      if(response.ok)return;
+      if(response.ok)return assignedPort;
     }catch{}
-    await pause(250);
+    if(child.exitCode!==null||child.signalCode!==null)break;
+    await pause(200);
   }
-  throw new Error('A API não ficou disponível na porta 3001.');
+  throw new Error('A API não respondeu na porta interna '+assignedPort+'.');
 }
 async function startApi(env){
   if(apiChild && apiChild.exitCode===null)return;
+  apiPort=null;
   const child=spawn(process.execPath,['src/server.js'],{
     cwd:apiDir,env:{...process.env,...env,
+      PORT:'0',BIND_HOST:'127.0.0.1',
       GFIT_PRIVATE_DIR:privateDir,GFIT_UPDATE_SOCKET:controlSocket,
       GFIT_UPDATE_TOKEN:controlToken,
-    },stdio:['ignore','inherit','inherit'],
+    },stdio:['ignore','inherit','inherit','ipc'],
   });
   apiChild=child;
-  child.on('error',e=>console.error('Falha ao iniciar API: '+e.message));
-  try{await waitApiReady(child);}
-  catch(error){child.kill();apiChild=null;throw error;}
+  try{apiPort=await waitApiReady(child);}
+  catch(error){
+    child.kill();
+    if(apiChild===child){apiChild=null;apiPort=null;}
+    throw error;
+  }
+  console.log('G-Fit API interna disponível em 127.0.0.1:'+apiPort);
   child.on('exit',(code)=>{
-    apiChild=null;
+    if(apiChild===child){apiChild=null;apiPort=null;}
     if(!closing&&!updateInProgress){
       console.error('A API parou ('+code+'). Reiniciando o projeto via aaPanel.');
       process.exit(1);
@@ -339,7 +371,8 @@ const mime={
 };
 function proxyApi(req,res){
   if(updateInProgress)return respond(res,503,{error:'Atualização ZIP em andamento. Aguarde a reinicialização.'});
-  const headers={...req.headers,host:'127.0.0.1:3001'};
+  if(!apiPort)return respond(res,503,{error:'API inicializando ou temporariamente indisponível.'});
+  const headers={...req.headers,host:'127.0.0.1:'+apiPort};
   // Remove untrusted forwarding headers before handing the request to Express.
   for(const key of ['x-forwarded-for','x-forwarded-host','x-forwarded-proto']){
     delete headers[key];
@@ -356,7 +389,7 @@ function proxyApi(req,res){
   headers['x-gfit-public-host']=req.headers.host||'';
   headers['x-gfit-public-scheme']=headers['x-forwarded-proto'];
   const up=http.request({
-    hostname:'127.0.0.1',port:3001,
+    hostname:'127.0.0.1',port:apiPort,
     path:req.url,method:req.method,headers,
   },upRes=>{
     res.writeHead(upRes.statusCode||502,upRes.headers);
