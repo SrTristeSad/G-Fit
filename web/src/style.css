@@ -565,3 +565,25 @@ button.header-shortcut:hover,button.header-shortcut:focus-visible {
   .admin-main-heading .secondary-light { width: 100%; }
   .admin-summary-card,.admin-security-card { padding: 18px; }
 }
+
+
+/* Administrator may switch workspace without losing the authenticated session. */
+.workspace-switcher {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 11px; padding: 4px; background: rgba(0,0,0,.18);
+  border: 1px solid rgba(224,255,234,.18);
+}
+.workspace-switcher button {
+  border: 0; border-radius: 8px; background: transparent;
+  color: #d1e3d8; font-size: 12px; font-weight: 750;
+  padding: 9px 12px; white-space: nowrap;
+}
+.workspace-switcher button.active {
+  background: #d9f1d7; color: #164d34;
+}
+.workspace-switcher button:hover:not(.active) { background: rgba(255,255,255,.11); }
+.workspace-switcher button:focus-visible { outline: 2px solid #b0fac6; outline-offset: 2px; }
+@media(max-width:700px) {
+  .workspace-switcher { width: 100%; order: 1; justify-content: center; }
+  .workspace-switcher button { flex: 1; }
+}
