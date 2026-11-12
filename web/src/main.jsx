@@ -33,9 +33,10 @@ function App() {
   }, []);
 
   const route = resolveWorkspaceRoute(pathname, teacher);
-  const tab = route.view === 'account' ? 'account'
-    : teacher?.isAdmin ? 'admin' : route.view;
   const adminEntry = pathname === '/admin' || pathname.startsWith('/admin/');
+  const inAdminWorkspace = Boolean(teacher?.isAdmin && adminEntry);
+  const tab = route.view === 'account' ? 'account'
+    : inAdminWorkspace ? 'admin' : route.view;
   const registering = !adminEntry && mode === 'register';
 
   useEffect(() => {
@@ -73,10 +74,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (teacher && !teacher.isAdmin) {
+    if (teacher && !adminEntry) {
       refreshStudents().catch(err => setError(err.message));
     }
-  }, [teacher, refreshStudents]);
+  }, [teacher, adminEntry, refreshStudents]);
 
   async function submitAuth(event) {
     event.preventDefault();
@@ -134,16 +135,28 @@ function App() {
         <div className="brand"><span className="symbol">G</span><span>Fit</span><span className="brand-subtitle">Plataforma de gestão</span></div>
         {teacher && (
           <div className="header-actions">
-            <span className="workspace-badge">{teacher.isAdmin ? 'Administrador' : 'Professor'}</span>
+            <span className="workspace-badge">{inAdminWorkspace ? 'Administrador' : 'Área do professor'}</span>
             <span className="header-name">{teacher.name}</span>
+            {teacher.isAdmin && (
+              <nav aria-label="Alternar ambiente" className="workspace-switcher">
+                <button type="button" className={!inAdminWorkspace ? 'active' : ''}
+                  aria-current={!inAdminWorkspace ? 'page' : undefined}
+                  onClick={() => navigate('/professor')}>Área do professor</button>
+                <button type="button" className={inAdminWorkspace ? 'active' : ''}
+                  aria-current={inAdminWorkspace ? 'page' : undefined}
+                  onClick={() => navigate('/admin')}>Administração</button>
+              </nav>
+            )}
             <button className="header-shortcut" type="button" onClick={() => {
-              navigate(tab === 'account' ? homeFor(teacher) : urlFor(teacher, 'account'));
+              const workspace = inAdminWorkspace ? 'admin' : 'professor';
+              navigate(tab === 'account' ? urlFor(teacher, inAdminWorkspace ? 'overview' : 'students', workspace)
+                : urlFor(teacher, 'account', workspace));
             }}>{tab === 'account' ? 'Voltar ao painel' : 'Conta e segurança'}</button>
             <button className="secondary" disabled={busy} onClick={logout}>Sair</button>
           </div>
         )}
       </header>
-      <main className={teacher?.isAdmin ? 'admin-root' : undefined}>
+      <main className={inAdminWorkspace ? 'admin-root' : undefined}>
         {!teacher ? (
           <section className="auth card">
             <div className="eyebrow">{adminEntry ? 'Área administrativa' : 'Movimento com cuidado'}</div>
@@ -175,21 +188,21 @@ function App() {
           </section>
         ) : (
           <>
-            {!teacher.isAdmin && tab !== 'account' && <nav aria-label="Área do professor" className="tabs teacher-tabs">
-              <button className={tab === 'students' ? 'active' : ''} onClick={() => { navigate(urlFor(teacher, 'students')); }}>
+            {!inAdminWorkspace && tab !== 'account' && <nav aria-label="Área do professor" className="tabs teacher-tabs">
+              <button className={tab === 'students' ? 'active' : ''} onClick={() => { navigate(urlFor(teacher, 'students', 'professor')); }}>
                 Meus alunos
               </button>
               <button className={tab === 'library' ? 'active' : ''} onClick={() => {
-                navigate(urlFor(teacher, 'library'));
+                navigate(urlFor(teacher, 'library', 'professor'));
               }}>Exercícios</button>
               <button className={tab === 'classes' ? 'active' : ''} onClick={() => {
-                navigate(urlFor(teacher, 'classes'));
+                navigate(urlFor(teacher, 'classes', 'professor'));
               }}>Turmas e presença</button>
               <button className={tab === 'reports' ? 'active' : ''} onClick={() => {
-                navigate(urlFor(teacher, 'reports'));
+                navigate(urlFor(teacher, 'reports', 'professor'));
               }}>Relatórios</button>
               <button className={tab === 'billing' ? 'active' : ''} onClick={() => {
-                navigate(urlFor(teacher, 'billing'));
+                navigate(urlFor(teacher, 'billing', 'professor'));
               }}>Pix (teste)</button>
             </nav>}
             {tab === 'account' ? <AccountPanel onPasswordChanged={() => {
@@ -197,9 +210,9 @@ function App() {
                 navigate('/', { replace: true });
                 setError('Senha alterada. Entre novamente com a nova senha.');
               }} /> :
-              teacher.isAdmin ? <AdminPanel view={route.view}
-                onNavigate={section => navigate(urlFor(teacher, section))}
-                onOpenSecurity={() => navigate(urlFor(teacher, 'account'))} /> :
+              inAdminWorkspace ? <AdminPanel view={route.view}
+                onNavigate={section => navigate(urlFor(teacher, section, 'admin'))}
+                onOpenSecurity={() => navigate(urlFor(teacher, 'account', 'admin'))} /> :
               tab === 'billing' ? <BillingPanel /> :
               tab === 'library' ? <ExerciseLibrary /> :
               tab === 'classes' ? <ClassManager /> :
