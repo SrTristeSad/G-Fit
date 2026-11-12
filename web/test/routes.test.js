@@ -17,6 +17,12 @@ test('every section has a stable URL inside the proper workspace', () => {
   assert.equal(urlFor(professor, 'account'), '/professor/conta');
   assert.equal(urlFor(admin, 'not-found'), '/admin');
   assert.equal(urlFor(professor, 'not-found'), '/professor');
+  // Administrators can switch between both real workspaces.
+  assert.equal(urlFor(admin, 'students', 'professor'), '/professor');
+  assert.equal(urlFor(admin, 'library', 'professor'), '/professor/exercicios');
+  assert.equal(urlFor(admin, 'account', 'professor'), '/professor/conta');
+  assert.equal(urlFor(admin, 'account', 'admin'), '/admin/conta');
+  assert.equal(urlFor(professor, 'teachers', 'admin'), '/professor');
   for (const url of Object.values(ADMIN_ROUTES)) assert.match(url, /^\/admin(?:\/|$)/);
   for (const url of Object.values(PROFESSOR_ROUTES)) assert.match(url, /^\/professor(?:\/|$)/);
 });
@@ -27,13 +33,15 @@ test('deep links identify the appropriate section after page reload', () => {
   }
   for (const [view, path] of Object.entries(PROFESSOR_ROUTES)) {
     assert.deepEqual(resolveWorkspaceRoute(path, professor), { view, redirect: null });
+    assert.deepEqual(resolveWorkspaceRoute(path, admin), { view, redirect: null });
   }
   assert.deepEqual(resolveWorkspaceRoute('/admin/planos/', admin), { view: 'plans', redirect: null });
   assert.deepEqual(resolveWorkspaceRoute('/professor/turmas/', professor), { view: 'classes', redirect: null });
+  assert.deepEqual(resolveWorkspaceRoute('/professor/turmas/', admin), { view: 'classes', redirect: null });
 });
 
 test('cross-role, unknown and root URLs redirect to the current user home', () => {
-  for (const path of ['/', '/professor', '/professor/exercicios', '/admin/unknown', '/administrador']) {
+  for (const path of ['/', '/admin/unknown', '/administrador']) {
     const route = resolveWorkspaceRoute(path, admin);
     assert.equal(route.redirect, '/admin');
     assert.equal(route.view, 'overview');
